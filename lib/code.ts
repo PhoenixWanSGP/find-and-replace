@@ -126,33 +126,104 @@ if (figma.editorType === "figma") {
       console.error("Error in toggleHighlightFrame:", error);
     }
   }
+  interface ModifiedNodeInfo {
+    id: string;
+    type: string;
+    name: string;
+    characters?: string;
+  }
+
+  // Function that replaces text or names within nodes based on provided criteria and returns an array of modified node information.
+  async function replaceAllNodes(
+    nodes: readonly SceneNode[] | PageNode[],
+    query: string,
+    caseSensitive: boolean,
+    matchWholeWord: boolean,
+    newValue: string,
+    currentTab: string
+  ): Promise<ModifiedNodeInfo[]> {
+    const regexFlags = caseSensitive ? "g" : "gi";
+    const regexPattern = matchWholeWord ? `\\b${query}\\b` : query;
+    const regex = new RegExp(regexPattern, regexFlags);
+    const modifiedNodes: ModifiedNodeInfo[] = [];
+
+    for (const node of nodes) {
+      if (currentTab === "text" && node.type === "TEXT") {
+        try {
+          await figma.loadFontAsync(node.fontName as FontName);
+          const newCharacters = node.characters.replace(regex, newValue);
+          if (newCharacters !== node.characters) {
+            node.characters = newCharacters;
+            modifiedNodes.push({
+              id: node.id,
+              type: node.type,
+              name: node.name,
+              characters: newCharacters,
+            });
+          }
+        } catch (error) {
+          console.error("Failed to load font for text replacement:", error);
+        }
+      } else if (currentTab === "layer" && node.type !== "TEXT") {
+        const newName = node.name.replace(regex, newValue);
+        if (newName !== node.name) {
+          node.name = newName;
+          modifiedNodes.push({
+            id: node.id,
+            type: node.type,
+            name: newName,
+          });
+        }
+      }
+
+      if ("children" in node && node.children.length > 0) {
+        const childModifiedNodes = await replaceAllNodes(
+          node.children as readonly SceneNode[],
+          query,
+          caseSensitive,
+          matchWholeWord,
+          newValue,
+          currentTab
+        );
+        modifiedNodes.push(...childModifiedNodes);
+      }
+    }
+
+    return modifiedNodes;
+  }
 
   figma.ui.onmessage = async (msg: Message) => {
     console.log("get message:", msg);
     switch (msg.type) {
       case "search":
-        const { currentTab, query, caseSensitive, matchWholeWord } =
-          msg.payload;
-        if (!query) {
+        {
+          const { currentTab, query, caseSensitive, matchWholeWord } =
+            msg.payload;
+          if (!query) {
+            figma.ui.postMessage({
+              type: "search-results",
+              payload: { category: currentTab, data: [] },
+            });
+            console.log("====search result:====\nnull");
+            return;
+          }
+
+          const nodesToSearch = figma.currentPage.selection.length
+            ? figma.currentPage.selection
+            : [figma.currentPage];
+          const searchResults = nodesToSearch.flatMap((node) =>
+            searchNodes(node, query, caseSensitive, matchWholeWord, currentTab)
+          );
           figma.ui.postMessage({
             type: "search-results",
-            payload: { category: currentTab, data: [] },
+            payload: { category: currentTab, data: searchResults },
           });
-          console.log("====search result:====\nnull");
-          return;
+          console.log(
+            "====search result sent:====\n",
+            currentTab,
+            searchResults
+          );
         }
-
-        const nodesToSearch = figma.currentPage.selection.length
-          ? figma.currentPage.selection
-          : [figma.currentPage];
-        const searchResults = nodesToSearch.flatMap((node) =>
-          searchNodes(node, query, caseSensitive, matchWholeWord, currentTab)
-        );
-        figma.ui.postMessage({
-          type: "search-results",
-          payload: { category: currentTab, data: searchResults },
-        });
-        console.log("====search result sent:====\n", currentTab, searchResults);
         break;
 
       case "select-node":
@@ -184,11 +255,87 @@ if (figma.editorType === "figma") {
         break;
 
       case "replace":
-        console.log("====收到replace消息====：", msg);
+        {
+          console.log("====收到replace消息====：", msg);
+          const {
+            nodeId,
+            newValue,
+            query,
+            caseSensitive,
+            matchWholeWord,
+            currentTab,
+          } = msg.payload;
+          const regexFlags = caseSensitive ? "g" : "gi";
+          const regexPattern = matchWholeWord ? `\\b${query}\\b` : query;
+          const regex = new RegExp(regexPattern, regexFlags);
+
+          const targetNode = (await figma.getNodeByIdAsync(
+            nodeId
+          )) as SceneNode;
+          if (!targetNode) {
+            console.error("Node not found:", nodeId);
+            return;
+          }
+
+          if (targetNode.type === "TEXT") {
+            // 在替换文本前确保字体已加载
+            try {
+              await figma.loadFontAsync(
+                (targetNode as TextNode).fontName as FontName
+              );
+              // 替换字符中匹配的部分
+              (targetNode as TextNode).characters = (
+                targetNode as TextNode
+              ).characters.replace(regex, newValue);
+              console.log("Text node characters updated.");
+            } catch (error) {
+              console.error("Failed to load font:", error);
+              return;
+            }
+          } else if (
+            ["FRAME", "COMPONENT", "INSTANCE"].includes(targetNode.type)
+          ) {
+            // 对于层级节点，替换名称中的匹配部分
+            targetNode.name = targetNode.name.replace(regex, newValue);
+            console.log("Frame-like node name updated.");
+          }
+
+          // 向前端发送替换完成的消息
+          figma.ui.postMessage({
+            type: "replace-done",
+            payload: {
+              nodeId: nodeId,
+              currentTab: currentTab,
+              newData:
+                targetNode.type === "TEXT"
+                  ? { characters: (targetNode as TextNode).characters }
+                  : { name: targetNode.name },
+            },
+          });
+        }
         break;
 
       case "replace-all":
-        console.log("====收到replace消息====：", msg);
+        const { query, caseSensitive, matchWholeWord, newValue, currentTab } =
+          msg.payload;
+        const nodesToReplace =
+          figma.currentPage.selection.length > 0
+            ? figma.currentPage.selection
+            : [figma.currentPage];
+        await figma.loadAllPagesAsync();
+        const modifiedNodes = await replaceAllNodes(
+          nodesToReplace,
+          query,
+          caseSensitive,
+          matchWholeWord,
+          newValue,
+          currentTab
+        );
+        figma.ui.postMessage({
+          type: "search-results",
+          payload: { category: currentTab, data: modifiedNodes },
+        });
+        console.log("All replacements done and results sent back to the UI.");
         break;
 
       default:

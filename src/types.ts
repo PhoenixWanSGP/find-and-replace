@@ -19,7 +19,7 @@ export interface SearchParams {
 
 export interface ReplaceParams {
   type: TabName;
-  nodeId: string;
+  nodeId?: string | null;
   newValue: string;
 }
 

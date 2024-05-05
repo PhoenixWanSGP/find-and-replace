@@ -12,6 +12,7 @@ import SearchInput from "./components/SearchInput";
 import ReplaceComponent from "./components/ReplaceComponent";
 import Footer from "./components/Footer";
 import SearchResult from "./components/SearchResult";
+import ResultsIndicator from "./components/ResultsIndicator";
 
 function App() {
   const [currentTab, setCurrentTab] = useState<TabName>("text");
@@ -126,7 +127,6 @@ function App() {
 
   const updateSearchParams =
     (type: TabName) => (newParams: Partial<SearchParams>) => {
-      console.log(`Updating search params for ${type}`, newParams);
       setTabData((prevState) => ({
         ...prevState,
         [type]: {
@@ -141,7 +141,6 @@ function App() {
 
   const updateReplaceParams =
     (type: TabName) => (newParams: Partial<ReplaceParams>) => {
-      console.log(`Updating replace params for ${type}`, newParams);
       setTabData((prevState) => ({
         ...prevState,
         [type]: {
@@ -162,10 +161,12 @@ function App() {
         selectedNodeId: nodeId,
       },
     }));
+    updateReplaceParams(tab)({ nodeId: nodeId });
   };
 
   const handleSearch = (searchParams: SearchParams) => {
     const currentTabData = tabData[currentTab];
+    // 检查当前的搜索参数是否与上一次相同
     if (
       searchParams.query === currentTabData.lastSearchParams.query &&
       searchParams.caseSensitive ===
@@ -173,19 +174,25 @@ function App() {
       searchParams.matchWholeWord ===
         currentTabData.lastSearchParams.matchWholeWord
     ) {
-      const newSelectedIndex =
-        (currentTabData.selectedIndex + 1) %
-        currentTabData.searchResults.length;
-      setTabData((prev) => ({
-        ...prev,
-        [currentTab]: {
-          ...currentTabData,
-          selectedIndex: newSelectedIndex,
-        },
-      }));
-      const newNodeId = currentTabData.searchResults[newSelectedIndex].id;
-      updateSelectedNodeId(currentTab, newNodeId);
-      setGlobalCurrentNode(newNodeId);
+      // 进一步检查搜索结果是否非空
+      if (currentTabData.searchResults.length > 0) {
+        const newSelectedIndex =
+          (currentTabData.selectedIndex + 1) %
+          currentTabData.searchResults.length;
+        setTabData((prev) => ({
+          ...prev,
+          [currentTab]: {
+            ...currentTabData,
+            selectedIndex: newSelectedIndex,
+          },
+        }));
+        const newNodeId = currentTabData.searchResults[newSelectedIndex].id;
+        updateSelectedNodeId(currentTab, newNodeId);
+        setGlobalCurrentNode(newNodeId);
+      } else {
+        // 如果搜索结果为空，可能需要显示一些消息或处理逻辑，例如：
+        console.log("No search results available to cycle through.");
+      }
     } else {
       parent.postMessage(
         {
@@ -214,8 +221,16 @@ function App() {
   };
 
   const handleReplace = (params: ReplaceParams, replaceAll: boolean) => {
-    // 根据 params 中的 type 确定当前活跃的标签
     const currentTab: TabName = params.type;
+    const currentSearchParams = tabData[currentTab].currentSearchParams; // 获取当前标签的搜索参数
+
+    // 确保查询字符串不为空
+    if (!currentSearchParams.query.trim()) {
+      console.log("Replace action aborted: Query string is empty.");
+      // 可以在这里处理UI反馈，如显示一个错误消息
+      return; // 中断函数执行
+    }
+
     const messageType = replaceAll ? "replace-all" : "replace";
     parent.postMessage(
       {
@@ -225,6 +240,9 @@ function App() {
             ...params,
             currentTab: currentTab, // 使用从参数中推断的当前活跃的标签
             replaceAll: replaceAll,
+            query: currentSearchParams.query, // 将当前搜索的关键词加入 payload
+            caseSensitive: currentSearchParams.caseSensitive, // 添加大小写敏感选项
+            matchWholeWord: currentSearchParams.matchWholeWord, // 添加完整单词匹配选项
           },
         },
       },
@@ -262,33 +280,58 @@ function App() {
   };
 
   useEffect(() => {
-    function handleSearchResults(event: any) {
-      const { type, payload } = event.data.pluginMessage;
-      if (type === "search-results") {
-        const { category, data } = payload;
-        if (Object.values(TabNames).includes(category)) {
-          // 现在使用TabNames对象进行检查
-          const tabCategory = category as TabName; // 类型断言，因为我们已经验证了它是有效的
-          setTabData((prev) => ({
-            ...prev,
-            [tabCategory]: {
-              ...prev[tabCategory],
-              searchResults: data,
-              selectedIndex: 0,
-            },
-          }));
-          if (data.length > 0) {
-            setGlobalCurrentNode(data[0].id);
-            updateSelectedNodeId(tabCategory, data[0].id);
-          }
-        } else {
-          console.error("Received invalid category:", category);
+    function handleFigmaMessages(event: any) {
+      if (event.data.pluginMessage) {
+        const { type, payload } = event.data.pluginMessage;
+        switch (type) {
+          case "search-results":
+            console.log("=====收到搜索结果====", event);
+            const { category, data } = payload;
+            if (Object.values(TabNames).includes(category)) {
+              const tabCategory = category as TabName;
+              setTabData((prev) => ({
+                ...prev,
+                [tabCategory]: {
+                  ...prev[tabCategory],
+                  searchResults: data,
+                  selectedIndex: 0,
+                },
+              }));
+              if (data.length > 0) {
+                setGlobalCurrentNode(data[0].id);
+                updateSelectedNodeId(tabCategory, data[0].id);
+              }
+            } else {
+              console.error("Received invalid category:", category);
+            }
+            break;
+
+          case "replace-done":
+            console.log("=====替换完成消息接收：====", payload);
+            const { nodeId, currentTab, newData } = payload;
+            if (currentTab in TabNames) {
+              setTabData((prev) => ({
+                ...prev,
+                [currentTab]: {
+                  ...prev[currentTab as keyof typeof prev], // 类型断言确保 currentTab 是 TabData 的键
+                  searchResults: prev[
+                    currentTab as keyof typeof prev
+                  ].searchResults.map((item) => {
+                    if (item.id === nodeId) {
+                      return { ...item, ...newData };
+                    }
+                    return item;
+                  }),
+                },
+              }));
+            }
+            break;
         }
       }
     }
-    window.onmessage = handleSearchResults;
+    window.onmessage = handleFigmaMessages;
     return () => {
-      window.onmessage = null;
+      window.onmessage = null; // 清除消息监听器
     };
   }, []);
 
@@ -382,6 +425,7 @@ function App() {
               } // 不需要传递 currentTab
               onUpdateReplaceParams={updateReplaceParams("text")}
             />
+            <ResultsIndicator currentTab={currentTab} tabData={tabData} />
 
             <SearchResult
               searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
@@ -406,6 +450,7 @@ function App() {
               } // 不需要传递 currentTab
               onUpdateReplaceParams={updateReplaceParams("layer")}
             />
+            <ResultsIndicator currentTab={currentTab} tabData={tabData} />
 
             <SearchResult
               searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
