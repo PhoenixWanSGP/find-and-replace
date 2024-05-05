@@ -152,6 +152,7 @@ if (figma.editorType === "figma") {
           type: "search-results",
           payload: { category: currentTab, data: searchResults },
         });
+        console.log("====search result sent:====\n", currentTab, searchResults);
         break;
 
       case "select-node":

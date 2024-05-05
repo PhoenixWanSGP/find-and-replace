@@ -12,8 +12,8 @@ export type TabName = keyof typeof TabNames;
 
 export interface SearchParams {
   query: string;
-  caseSensitive: boolean;
-  matchWholeWord: boolean;
+  caseSensitive?: boolean;
+  matchWholeWord?: boolean;
   type: TabName;
 }
 
@@ -25,6 +25,7 @@ export interface ReplaceParams {
 
 export type TabData = {
   [key in TabName]: {
+    currentSearchParams: SearchParams;
     lastSearchParams: SearchParams;
     replaceParams: ReplaceParams;
     selectedIndex: number;

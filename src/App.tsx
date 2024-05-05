@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ReplaceParams, SearchParams, TabName, TabNames } from "./types";
+import {
+  ReplaceParams,
+  SearchParams,
+  TabData,
+  TabName,
+  TabNames,
+} from "./types";
 import SearchInput from "./components/SearchInput";
 import ReplaceComponent from "./components/ReplaceComponent";
 import Footer from "./components/Footer";
@@ -13,115 +19,150 @@ function App() {
     null
   );
 
-  type TabData = {
-    [key in TabName]: {
-      lastSearchParams: SearchParams;
-      selectedIndex: number;
-      searchResults: any[];
-    };
-  };
-
   const [tabData, setTabData] = useState<TabData>({
     text: {
+      currentSearchParams: {
+        type: "text",
+        query: "",
+        caseSensitive: false,
+        matchWholeWord: false,
+      },
       lastSearchParams: {
         query: "",
         caseSensitive: false,
         matchWholeWord: false,
         type: "text",
       },
+      replaceParams: {
+        type: "text",
+        nodeId: "",
+        newValue: "",
+      },
       selectedIndex: 0,
       searchResults: [],
+      selectedNodeId: null,
     },
     layer: {
+      currentSearchParams: {
+        type: "layer",
+        query: "",
+        caseSensitive: false,
+        matchWholeWord: false,
+      },
       lastSearchParams: {
         query: "",
         caseSensitive: false,
         matchWholeWord: false,
         type: "layer",
       },
+      replaceParams: {
+        type: "layer",
+        nodeId: "",
+        newValue: "",
+      },
       selectedIndex: 0,
       searchResults: [],
+      selectedNodeId: null,
     },
     color: {
+      currentSearchParams: {
+        type: "color",
+        query: "",
+        caseSensitive: false,
+        matchWholeWord: false,
+      },
       lastSearchParams: {
         query: "",
         caseSensitive: false,
         matchWholeWord: false,
         type: "color",
       },
+      replaceParams: {
+        type: "color",
+        nodeId: "",
+        newValue: "",
+      },
       selectedIndex: 0,
       searchResults: [],
+      selectedNodeId: null,
     },
     font: {
+      currentSearchParams: {
+        type: "font",
+        query: "",
+      },
       lastSearchParams: {
         query: "",
-        caseSensitive: false,
-        matchWholeWord: false,
         type: "font",
       },
-      selectedIndex: 0,
-      searchResults: [],
-    },
-    instance: {
-      lastSearchParams: {
-        query: "",
-        caseSensitive: false,
-        matchWholeWord: false,
-        type: "instance",
+      replaceParams: {
+        type: "font",
+        nodeId: "",
+        newValue: "",
       },
       selectedIndex: 0,
       searchResults: [],
+      selectedNodeId: null,
     },
-  });
-
-  // const [searchResults] = useState({
-  //   text: [],
-  //   layer: [],
-  //   color: [],
-  //   font: [],
-  //   instance: [],
-  // });
-  const [currentSelectedNode, setCurrentSelectedNode] = useState({
-    text: null,
-    layer: null,
-    color: null,
-    font: null,
-    instance: null,
-  });
-
-  const [textSearchParams, setTextSearchParams] = useState<SearchParams>({
-    type: "text",
-    query: "",
-    caseSensitive: false,
-    matchWholeWord: false,
-  });
-  const [layerSearchParams, setLayerSearchParams] = useState<SearchParams>({
-    type: "layer",
-    query: "",
-    caseSensitive: false,
-    matchWholeWord: false,
-  });
-
-  const [textReplaceParams, setTextReplaceParams] = useState<ReplaceParams>({
-    type: "text",
-    nodeId: "",
-    newValue: "",
-  });
-  const [layerReplaceParams, setLayerReplaceParams] = useState<ReplaceParams>({
-    type: "layer",
-    nodeId: "",
-    newValue: "",
+    instance: {
+      currentSearchParams: {
+        type: "instance",
+        query: "",
+      },
+      lastSearchParams: {
+        query: "",
+        type: "instance",
+      },
+      replaceParams: {
+        type: "instance",
+        nodeId: "",
+        newValue: "",
+      },
+      selectedIndex: 0,
+      searchResults: [],
+      selectedNodeId: null,
+    },
   });
 
   const updateSearchParams =
-    (type: "text" | "layer") => (newParams: Partial<SearchParams>) => {
+    (type: TabName) => (newParams: Partial<SearchParams>) => {
       console.log(`Updating search params for ${type}`, newParams);
-      if (type === "text") {
-        setTextSearchParams((prev) => ({ ...prev, ...newParams }));
-      } else {
-        setLayerSearchParams((prev) => ({ ...prev, ...newParams }));
-      }
+      setTabData((prevState) => ({
+        ...prevState,
+        [type]: {
+          ...prevState[type],
+          currentSearchParams: {
+            ...prevState[type].currentSearchParams,
+            ...newParams, // 确保只合并提供的字段
+          },
+        },
+      }));
     };
+
+  const updateReplaceParams =
+    (type: TabName) => (newParams: Partial<ReplaceParams>) => {
+      console.log(`Updating replace params for ${type}`, newParams);
+      setTabData((prevState) => ({
+        ...prevState,
+        [type]: {
+          ...prevState[type],
+          replaceParams: {
+            ...prevState[type].replaceParams,
+            ...newParams, // 合并新的替换参数到现有的状态中
+          },
+        },
+      }));
+    };
+
+  const updateSelectedNodeId = (tab: TabName, nodeId: string | null) => {
+    setTabData((prev) => ({
+      ...prev,
+      [tab]: {
+        ...prev[tab],
+        selectedNodeId: nodeId,
+      },
+    }));
+  };
 
   const handleSearch = (searchParams: SearchParams) => {
     const currentTabData = tabData[currentTab];
@@ -143,8 +184,8 @@ function App() {
         },
       }));
       const newNodeId = currentTabData.searchResults[newSelectedIndex].id;
+      updateSelectedNodeId(currentTab, newNodeId);
       setGlobalCurrentNode(newNodeId);
-      setCurrentSelectedNode((prev) => ({ ...prev, [currentTab]: newNodeId }));
     } else {
       parent.postMessage(
         {
@@ -172,17 +213,9 @@ function App() {
     }
   };
 
-  const updateReplaceParams =
-    (type: "text" | "layer") => (newParams: Partial<ReplaceParams>) => {
-      console.log(`Updating replace params for ${type}`, newParams);
-      if (type === "text") {
-        setTextReplaceParams((prev) => ({ ...prev, ...newParams }));
-      } else {
-        setLayerReplaceParams((prev) => ({ ...prev, ...newParams }));
-      }
-    };
-
   const handleReplace = (params: ReplaceParams, replaceAll: boolean) => {
+    // 根据 params 中的 type 确定当前活跃的标签
+    const currentTab: TabName = params.type;
     const messageType = replaceAll ? "replace-all" : "replace";
     parent.postMessage(
       {
@@ -190,7 +223,7 @@ function App() {
           type: messageType,
           payload: {
             ...params,
-            currentTab: currentTab,
+            currentTab: currentTab, // 使用从参数中推断的当前活跃的标签
             replaceAll: replaceAll,
           },
         },
@@ -215,17 +248,14 @@ function App() {
       }));
     }
 
-    setCurrentSelectedNode((prev) => ({
-      ...prev,
-      [tab]: nodeId,
-    }));
+    updateSelectedNodeId(tab, nodeId);
     setGlobalCurrentNode(nodeId);
   };
 
   const handleTabChange = (newTab: TabName) => {
     console.log(`Tab changed to ${newTab}`);
     setCurrentTab(newTab);
-    const newNodeId = currentSelectedNode[newTab];
+    const newNodeId = tabData[newTab].selectedNodeId;
     if (newNodeId !== globalCurrentNode) {
       setGlobalCurrentNode(newNodeId);
     }
@@ -249,10 +279,7 @@ function App() {
           }));
           if (data.length > 0) {
             setGlobalCurrentNode(data[0].id);
-            setCurrentSelectedNode((prev) => ({
-              ...prev,
-              [tabCategory]: data[0].id,
-            }));
+            updateSelectedNodeId(tabCategory, data[0].id);
           }
         } else {
           console.error("Received invalid category:", category);
@@ -309,10 +336,6 @@ function App() {
     console.log("Global current node updated", globalCurrentNode);
   }, [globalCurrentNode]);
 
-  // useEffect(() => {
-  //   console.log("Search results updated", searchResults);
-  // }, [searchResults]);
-
   useEffect(() => {
     // 总是发送消息到后端，不论 globalCurrentNode 是否为空
     parent.postMessage(
@@ -347,13 +370,16 @@ function App() {
 
           <TabsContent value="text" className="flex flex-col items-center m-0">
             <SearchInput
-              searchParams={textSearchParams}
-              onSearch={() => handleSearch(textSearchParams)}
-              onUpdateSearchParams={updateSearchParams("text")}
+              searchParams={tabData.text.currentSearchParams} // 从 tabData 获取当前 text 类型的搜索参数
+              onSearch={() => handleSearch(tabData.text.currentSearchParams)} // 使用 tabData 中的当前搜索参数进行搜索
+              onUpdateSearchParams={updateSearchParams("text")} // 传递更新函数，已配置为更新 text 类型的搜索参数
             />
+
             <ReplaceComponent
-              replaceParams={textReplaceParams}
-              onReplace={handleReplace}
+              replaceParams={tabData.text.replaceParams}
+              onReplace={(params, replaceAll) =>
+                handleReplace(params, replaceAll)
+              } // 不需要传递 currentTab
               onUpdateReplaceParams={updateReplaceParams("text")}
             />
 
@@ -361,20 +387,23 @@ function App() {
               searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
               query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
               currentTab={currentTab} // 当前激活的标签页
-              selectedNodeId={currentSelectedNode[currentTab]} // 当前标签页选中的节点ID
+              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
               onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
             />
           </TabsContent>
 
           <TabsContent value="layer" className="flex flex-col items-center m-0">
             <SearchInput
-              searchParams={layerSearchParams}
-              onSearch={() => handleSearch(layerSearchParams)}
-              onUpdateSearchParams={updateSearchParams("layer")}
+              searchParams={tabData.layer.currentSearchParams} // 从 tabData 获取当前 layer 类型的搜索参数
+              onSearch={() => handleSearch(tabData.layer.currentSearchParams)} // 使用 tabData 中的当前搜索参数进行搜索
+              onUpdateSearchParams={updateSearchParams("layer")} // 传递更新函数，已配置为更新 layer 类型的搜索参数
             />
+
             <ReplaceComponent
-              replaceParams={layerReplaceParams}
-              onReplace={handleReplace}
+              replaceParams={tabData.layer.replaceParams}
+              onReplace={(params, replaceAll) =>
+                handleReplace(params, replaceAll)
+              } // 不需要传递 currentTab
               onUpdateReplaceParams={updateReplaceParams("layer")}
             />
 
@@ -382,7 +411,7 @@ function App() {
               searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
               query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
               currentTab={currentTab} // 当前激活的标签页
-              selectedNodeId={currentSelectedNode[currentTab]} // 当前标签页选中的节点ID
+              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
               onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
             />
           </TabsContent>
