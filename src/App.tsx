@@ -13,6 +13,7 @@ import ReplaceComponent from "./components/ReplaceComponent";
 import Footer from "./components/Footer";
 import SearchResult from "./components/SearchResult";
 import ResultsIndicator from "./components/ResultsIndicator";
+import ColorScrollArea from "./components/ColorScrollArea";
 
 function App() {
   const [currentTab, setCurrentTab] = useState<TabName>("text");
@@ -42,6 +43,7 @@ function App() {
       selectedIndex: 0,
       searchResults: [],
       selectedNodeId: null,
+      searchList: [],
     },
     layer: {
       currentSearchParams: {
@@ -64,6 +66,7 @@ function App() {
       selectedIndex: 0,
       searchResults: [],
       selectedNodeId: null,
+      searchList: [],
     },
     color: {
       currentSearchParams: {
@@ -86,6 +89,7 @@ function App() {
       selectedIndex: 0,
       searchResults: [],
       selectedNodeId: null,
+      searchList: [],
     },
     font: {
       currentSearchParams: {
@@ -104,6 +108,7 @@ function App() {
       selectedIndex: 0,
       searchResults: [],
       selectedNodeId: null,
+      searchList: [],
     },
     instance: {
       currentSearchParams: {
@@ -122,6 +127,7 @@ function App() {
       selectedIndex: 0,
       searchResults: [],
       selectedNodeId: null,
+      searchList: [],
     },
   });
 
@@ -162,6 +168,14 @@ function App() {
       },
     }));
     updateReplaceParams(tab)({ nodeId: nodeId });
+  };
+
+  const handleTabChange = (newTab: TabName) => {
+    setCurrentTab(newTab);
+    const newNodeId = tabData[newTab].selectedNodeId;
+    if (newNodeId !== globalCurrentNode) {
+      setGlobalCurrentNode(newNodeId);
+    }
   };
 
   const handleSearch = (searchParams: SearchParams) => {
@@ -251,7 +265,6 @@ function App() {
   };
 
   const handleSelectNode = (nodeId: string, tab: TabName) => {
-    console.log(`Node selected: ${nodeId} in tab: ${tab}`);
     const newIndex = tabData[tab].searchResults.findIndex(
       (result) => result.id === nodeId
     );
@@ -270,13 +283,21 @@ function App() {
     setGlobalCurrentNode(nodeId);
   };
 
-  const handleTabChange = (newTab: TabName) => {
-    console.log(`Tab changed to ${newTab}`);
-    setCurrentTab(newTab);
-    const newNodeId = tabData[newTab].selectedNodeId;
-    if (newNodeId !== globalCurrentNode) {
-      setGlobalCurrentNode(newNodeId);
-    }
+  const handleRefreshColors = () => {
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "get-all-colors",
+          payload: {},
+        },
+      },
+      "*"
+    );
+  };
+
+  const handleSelectColor = (color: string) => {
+    console.log("Selected Color:", color);
+    // 这里可以添加更多处理逻辑，比如更新状态或调用API等
   };
 
   useEffect(() => {
@@ -285,7 +306,6 @@ function App() {
         const { type, payload } = event.data.pluginMessage;
         switch (type) {
           case "search-results":
-            console.log("=====收到搜索结果====", event);
             const { category, data } = payload;
             if (Object.values(TabNames).includes(category)) {
               const tabCategory = category as TabName;
@@ -307,7 +327,6 @@ function App() {
             break;
 
           case "replace-done":
-            console.log("=====替换完成消息接收：====", payload);
             const { nodeId, currentTab, newData } = payload;
             if (currentTab in TabNames) {
               setTabData((prev) => ({
@@ -326,6 +345,19 @@ function App() {
               }));
             }
             break;
+
+          case "color-results":
+            // 用提供的颜色数据更新color标签下的searchList
+            console.log("====收到所有颜色====", payload.data);
+            setTabData((prev) => ({
+              ...prev,
+              color: {
+                ...prev.color,
+                searchList: payload.data,
+              },
+            }));
+            // console.log("====存好所有颜色====", tabData.color.searchList);
+            break;
         }
       }
     }
@@ -337,7 +369,6 @@ function App() {
 
   useEffect(() => {
     const handleFocus = () => {
-      console.log("Window focused");
       parent.postMessage(
         {
           pluginMessage: {
@@ -352,7 +383,6 @@ function App() {
     };
 
     const handleBlur = () => {
-      console.log("Window blurred");
       parent.postMessage(
         {
           pluginMessage: {
@@ -375,9 +405,7 @@ function App() {
     };
   }, [globalCurrentNode]);
 
-  useEffect(() => {
-    console.log("Global current node updated", globalCurrentNode);
-  }, [globalCurrentNode]);
+  useEffect(() => {}, [globalCurrentNode]);
 
   useEffect(() => {
     // 总是发送消息到后端，不论 globalCurrentNode 是否为空
@@ -392,8 +420,17 @@ function App() {
       },
       "*"
     );
-    console.log("====当前选中节点变化====", globalCurrentNode);
   }, [globalCurrentNode]); // 监听 globalCurrentNode 的变化
+
+  useEffect(() => {
+    // 此 useEffect 用于监听 tabData 下所有标签的 searchList 的变化
+    // 对于本示例，我们暂时仅处理 color 标签
+    console.log("SearchList has been updated", tabData.color.searchList);
+  }, [
+    tabData.color.searchList,
+    tabData.font.searchList,
+    tabData.instance.searchList,
+  ]);
 
   return (
     <>
@@ -461,7 +498,22 @@ function App() {
             />
           </TabsContent>
 
-          <TabsContent value="color"></TabsContent>
+          <TabsContent value="color" className="flex flex-col items-center m-0">
+            {/* Scroll Area to display colors */}
+            <ColorScrollArea
+              colorData={tabData.color.searchList}
+              onSelectColor={handleSelectColor}
+            />
+
+            {/* Refresh button to trigger color data update */}
+            <button
+              className="mt-4 py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600"
+              onClick={handleRefreshColors}
+            >
+              Refresh Colors
+            </button>
+          </TabsContent>
+
           <TabsContent value="font"></TabsContent>
           <TabsContent value="instance"></TabsContent>
         </Tabs>

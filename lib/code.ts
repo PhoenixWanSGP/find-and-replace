@@ -10,16 +10,10 @@ if (figma.editorType === "figma") {
   }
 
   let inFigmaCurrentNode: string | null = null; // 存储全局节点ID
-  let currentNodeFocused: boolean = false; // 节点是否聚焦
+  // let currentNodeFocused: boolean = false; // 节点是否聚焦
 
   function isTextNode(node: SceneNode | PageNode): node is TextNode {
     return node.type === "TEXT";
-  }
-
-  function isFrameLikeNode(
-    node: SceneNode | PageNode
-  ): node is FrameNode | ComponentNode | InstanceNode {
-    return ["FRAME", "COMPONENT", "INSTANCE"].includes(node.type);
   }
 
   function searchNodes(
@@ -50,7 +44,7 @@ if (figma.editorType === "figma") {
             characters: node.characters,
           });
         }
-      } else if (category === "layer" && isFrameLikeNode(node)) {
+      } else if (category === "layer" && node.type !== "TEXT") {
         const nodeName = textCaseSensitive
           ? node.name
           : node.name.toLowerCase();
@@ -73,38 +67,29 @@ if (figma.editorType === "figma") {
     shouldCreate: boolean
   ) {
     try {
-      console.log(`操作节点ID: ${nodeId}, 是否创建框架: ${shouldCreate}`);
-      console.log("开始加载所有页面...");
       await figma.loadAllPagesAsync(); // 确保所有页面加载完成
-      console.log("所有页面加载完成");
-
-      console.log("查找现有的高亮框以删除...");
       const frames = figma.currentPage.findAll(
         (frame) => frame.name === "Highlight Frame"
       );
       frames.forEach((frame) => {
-        console.log(`删除高亮框: ${frame.id}`);
         frame.remove();
       });
 
       // 如果 nodeId 为空，则不执行创建高亮框的操作
       if (!nodeId) {
-        console.log("No node ID provided, skipping highlight frame creation.");
+        // console.log("No node ID provided, skipping highlight frame creation.");
         return;
       }
 
       if (shouldCreate) {
-        console.log(`正在尝试通过ID获取节点: ${nodeId}`);
         const targetNode = (await figma.getNodeByIdAsync(
           nodeId
         )) as SceneNode | null;
         if (targetNode) {
-          console.log("找到节点，正在移动视图以聚焦该节点...");
           figma.viewport.scrollAndZoomIntoView([targetNode]);
 
           const x = targetNode.absoluteTransform[0][2];
           const y = targetNode.absoluteTransform[1][2];
-          console.log(`节点位置: x=${x}, y=${y}`);
 
           const highlightFrame = figma.createRectangle();
           highlightFrame.name = "Highlight Frame";
@@ -117,9 +102,8 @@ if (figma.editorType === "figma") {
           ];
           highlightFrame.strokeWeight = 2;
           figma.currentPage.appendChild(highlightFrame);
-          console.log("高亮框创建完成，已添加到页面.");
         } else {
-          console.error("未找到节点或无法访问节点: ", nodeId);
+          console.error("No node found: ", nodeId);
         }
       }
     } catch (error) {
@@ -176,7 +160,7 @@ if (figma.editorType === "figma") {
         }
       }
 
-      if ("children" in node && node.children.length > 0) {
+      if ("children" in node) {
         const childModifiedNodes = await replaceAllNodes(
           node.children as readonly SceneNode[],
           query,
@@ -192,8 +176,78 @@ if (figma.editorType === "figma") {
     return modifiedNodes;
   }
 
+  async function collectColors(nodes: any) {
+    await figma.loadAllPagesAsync(); // 确保所有页面都被加载
+    const colorMap = new Map();
+
+    function toHex(value: number): string {
+      const hex = Math.round(value * 255).toString(16);
+      return hex.length === 1 ? "0" + hex : hex; // 确保是两位数
+    }
+
+    function rgbaToHex(r: number, g: number, b: number, a: number): string {
+      return ("#" + toHex(r) + toHex(g) + toHex(b) + toHex(a)).toUpperCase();
+    }
+
+    function processNode(node: any) {
+      if ("fills" in node && Array.isArray(node.fills)) {
+        node.fills.forEach((fill: any) => {
+          if (fill.type === "SOLID" && fill.visible !== false) {
+            const color = rgbaToHex(
+              fill.color.r,
+              fill.color.g,
+              fill.color.b,
+              fill.opacity || 1
+            );
+            let colorData = colorMap.get(color) || {
+              fillCount: 0,
+              strokeCount: 0,
+              totalCount: 0,
+            };
+            colorData.fillCount++;
+            colorData.totalCount++;
+            colorMap.set(color, colorData);
+          }
+        });
+      }
+      if ("strokes" in node && Array.isArray(node.strokes)) {
+        node.strokes.forEach((stroke: any) => {
+          if (stroke.type === "SOLID" && stroke.visible !== false) {
+            const color = rgbaToHex(
+              stroke.color.r,
+              stroke.color.g,
+              stroke.color.b,
+              stroke.opacity || 1
+            );
+            let colorData = colorMap.get(color) || {
+              fillCount: 0,
+              strokeCount: 0,
+              totalCount: 0,
+            };
+            colorData.strokeCount++;
+            colorData.totalCount++;
+            colorMap.set(color, colorData);
+          }
+        });
+      }
+      if ("children" in node) {
+        node.children.forEach(processNode);
+      }
+    }
+
+    nodes.forEach(processNode);
+
+    return Array.from(colorMap).map(([color, data]) => {
+      return {
+        color: color, // HEX格式的颜色
+        fillCount: data.fillCount,
+        strokeCount: data.strokeCount,
+        totalCount: data.totalCount,
+      };
+    });
+  }
+
   figma.ui.onmessage = async (msg: Message) => {
-    console.log("get message:", msg);
     switch (msg.type) {
       case "search":
         {
@@ -204,7 +258,6 @@ if (figma.editorType === "figma") {
               type: "search-results",
               payload: { category: currentTab, data: [] },
             });
-            console.log("====search result:====\nnull");
             return;
           }
 
@@ -218,37 +271,28 @@ if (figma.editorType === "figma") {
             type: "search-results",
             payload: { category: currentTab, data: searchResults },
           });
-          console.log(
-            "====search result sent:====\n",
-            currentTab,
-            searchResults
-          );
         }
         break;
 
       case "select-node":
         inFigmaCurrentNode = msg.payload.nodeId;
-        console.log("inFigmaCurrentNode 赋值完毕:", inFigmaCurrentNode);
         // 检查节点ID是否为空，如果为空，则取消创建高亮框
         if (inFigmaCurrentNode) {
           toggleHighlightFrame(inFigmaCurrentNode, true);
         } else {
-          console.log("Received empty node ID, clearing any highlights...");
           toggleHighlightFrame(inFigmaCurrentNode, false);
         }
         break;
 
       case "activate-view":
-        currentNodeFocused = true;
-        console.log("activate-view赋值完毕", currentNodeFocused);
+        // currentNodeFocused = true;
         if (inFigmaCurrentNode) {
           toggleHighlightFrame(inFigmaCurrentNode, true);
         }
         break;
 
       case "deactivate-view":
-        currentNodeFocused = false;
-        console.log("deactivate-view赋值完毕", currentNodeFocused);
+        // currentNodeFocused = false;
         if (inFigmaCurrentNode) {
           toggleHighlightFrame(inFigmaCurrentNode, false);
         }
@@ -256,7 +300,6 @@ if (figma.editorType === "figma") {
 
       case "replace":
         {
-          console.log("====收到replace消息====：", msg);
           const {
             nodeId,
             newValue,
@@ -284,20 +327,18 @@ if (figma.editorType === "figma") {
                 (targetNode as TextNode).fontName as FontName
               );
               // 替换字符中匹配的部分
-              (targetNode as TextNode).characters = (
-                targetNode as TextNode
-              ).characters.replace(regex, newValue);
-              console.log("Text node characters updated.");
+              targetNode.characters = targetNode.characters.replace(
+                regex,
+                newValue
+              );
             } catch (error) {
               console.error("Failed to load font:", error);
               return;
             }
-          } else if (
-            ["FRAME", "COMPONENT", "INSTANCE"].includes(targetNode.type)
-          ) {
-            // 对于层级节点，替换名称中的匹配部分
+          } else if (targetNode.name) {
+            // 简化条件，检查是否存在name属性
+            // 替换节点名称中匹配的部分
             targetNode.name = targetNode.name.replace(regex, newValue);
-            console.log("Frame-like node name updated.");
           }
 
           // 向前端发送替换完成的消息
@@ -308,7 +349,7 @@ if (figma.editorType === "figma") {
               currentTab: currentTab,
               newData:
                 targetNode.type === "TEXT"
-                  ? { characters: (targetNode as TextNode).characters }
+                  ? { characters: targetNode.characters }
                   : { name: targetNode.name },
             },
           });
@@ -335,7 +376,22 @@ if (figma.editorType === "figma") {
           type: "search-results",
           payload: { category: currentTab, data: modifiedNodes },
         });
-        console.log("All replacements done and results sent back to the UI.");
+        // console.log("All replacements done and results sent back to the UI.");
+        break;
+
+      case "get-all-colors":
+        console.log("后端收到信息:get-all-colors");
+        const nodesToInspect =
+          figma.currentPage.selection.length > 0
+            ? figma.currentPage.selection
+            : [figma.currentPage];
+        const colorsData = await collectColors(nodesToInspect);
+        figma.ui.postMessage({
+          type: "color-results",
+          payload: {
+            data: colorsData,
+          },
+        });
         break;
 
       default:

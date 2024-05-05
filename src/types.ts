@@ -31,12 +31,13 @@ export type TabData = {
     selectedIndex: number;
     searchResults: ResultBaseNode[];
     selectedNodeId: string | null;
+    searchList: any;
   };
 };
 
 export interface ResultBaseNode {
   id: string;
-  type: "TEXT" | "LAYER" | "FILLS" | "FONTNAME" | "INSTANCE"; // 明确指定可能的类型
+  type: string; // 明确指定可能的类型
   name?: string;
   characters?: string;
   fills?: string; // 添加颜色属性示例
@@ -51,4 +52,11 @@ export interface SearchResults {
 
 export interface HighlightParams {
   nodeId: string;
+}
+
+export interface ColorInfo {
+  color: string; // HEX颜色值
+  fillCount: number;
+  strokeCount: number;
+  totalCount: number;
 }
