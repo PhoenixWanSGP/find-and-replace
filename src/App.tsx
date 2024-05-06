@@ -13,7 +13,8 @@ import ReplaceComponent from "./components/ReplaceComponent";
 import Footer from "./components/Footer";
 import SearchResult from "./components/SearchResult";
 import ResultsIndicator from "./components/ResultsIndicator";
-import ColorScrollArea from "./components/ColorScrollArea";
+import { FaSync } from "react-icons/fa";
+// import ColorScrollArea from "./components/ColorScrollArea";
 
 function App() {
   const [currentTab, setCurrentTab] = useState<TabName>("text");
@@ -238,12 +239,17 @@ function App() {
     const currentTab: TabName = params.type;
     const currentSearchParams = tabData[currentTab].currentSearchParams; // 获取当前标签的搜索参数
 
-    // 确保查询字符串不为空
-    if (!currentSearchParams.query.trim()) {
+    // 确保查询字符串不为空或者query是ColorInfo类型
+    if (
+      typeof currentSearchParams.query === "string" &&
+      !currentSearchParams.query.trim()
+    ) {
       console.log("Replace action aborted: Query string is empty.");
       // 可以在这里处理UI反馈，如显示一个错误消息
       return; // 中断函数执行
     }
+
+    // 如果query是ColorInfo类型，则不需要进行空字符串检查
 
     const messageType = replaceAll ? "replace-all" : "replace";
     parent.postMessage(
@@ -257,6 +263,9 @@ function App() {
             query: currentSearchParams.query, // 将当前搜索的关键词加入 payload
             caseSensitive: currentSearchParams.caseSensitive, // 添加大小写敏感选项
             matchWholeWord: currentSearchParams.matchWholeWord, // 添加完整单词匹配选项
+            // 如果有新增的属性，也应该在这里加入payload
+            includeFills: currentSearchParams.includeFills,
+            includeStrokes: currentSearchParams.includeStrokes,
           },
         },
       },
@@ -432,6 +441,14 @@ function App() {
     tabData.instance.searchList,
   ]);
 
+  useEffect(() => {
+    console.log(
+      "currentSearchParams changed:",
+      tabData.color.currentSearchParams
+    );
+    // 这里可以根据currentSearchParams的变动执行其他操作
+  }, [tabData.color.currentSearchParams]);
+
   return (
     <>
       <div className="flex flex-col items-center w-full fixed top-0 left-0">
@@ -450,9 +467,12 @@ function App() {
 
           <TabsContent value="text" className="flex flex-col items-center m-0">
             <SearchInput
-              searchParams={tabData.text.currentSearchParams} // 从 tabData 获取当前 text 类型的搜索参数
-              onSearch={() => handleSearch(tabData.text.currentSearchParams)} // 使用 tabData 中的当前搜索参数进行搜索
-              onUpdateSearchParams={updateSearchParams("text")} // 传递更新函数，已配置为更新 text 类型的搜索参数
+              searchParams={tabData.text.currentSearchParams} // 获取 text 类型的搜索参数
+              onSearch={() => handleSearch(tabData.text.currentSearchParams)} // 进行搜索
+              onUpdateSearchParams={updateSearchParams("text")} // 更新搜索参数
+              activeTab={currentTab} // 当前激活的 tab
+              colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
+              onSelectColor={handleSelectColor} // 处理颜色选择的函数
             />
 
             <ReplaceComponent
@@ -475,9 +495,12 @@ function App() {
 
           <TabsContent value="layer" className="flex flex-col items-center m-0">
             <SearchInput
-              searchParams={tabData.layer.currentSearchParams} // 从 tabData 获取当前 layer 类型的搜索参数
-              onSearch={() => handleSearch(tabData.layer.currentSearchParams)} // 使用 tabData 中的当前搜索参数进行搜索
-              onUpdateSearchParams={updateSearchParams("layer")} // 传递更新函数，已配置为更新 layer 类型的搜索参数
+              searchParams={tabData.layer.currentSearchParams} // 获取 text 类型的搜索参数
+              onSearch={() => handleSearch(tabData.layer.currentSearchParams)} // 进行搜索
+              onUpdateSearchParams={updateSearchParams("layer")} // 更新搜索参数
+              activeTab={currentTab} // 当前激活的 tab
+              colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
+              onSelectColor={handleSelectColor} // 处理颜色选择的函数
             />
 
             <ReplaceComponent
@@ -500,17 +523,21 @@ function App() {
 
           <TabsContent value="color" className="flex flex-col items-center m-0">
             {/* Scroll Area to display colors */}
-            <ColorScrollArea
-              colorData={tabData.color.searchList}
-              onSelectColor={handleSelectColor}
+            <SearchInput
+              searchParams={tabData.color.currentSearchParams} // 获取 text 类型的搜索参数
+              onSearch={() => handleSearch(tabData.color.currentSearchParams)} // 进行搜索
+              onUpdateSearchParams={updateSearchParams("color")} // 更新搜索参数
+              activeTab={currentTab} // 当前激活的 tab
+              colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
+              onSelectColor={handleSelectColor} // 处理颜色选择的函数
             />
 
             {/* Refresh button to trigger color data update */}
             <button
-              className="mt-4 py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="py-2 px-3 bg-blue-500 text-white rounded hover:bg-blue-600"
               onClick={handleRefreshColors}
             >
-              Refresh Colors
+              <FaSync className="h-5 w-5" />
             </button>
           </TabsContent>
 

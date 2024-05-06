@@ -10,11 +10,15 @@ export const TabNames = {
 
 export type TabName = keyof typeof TabNames;
 
+export type QueryType = string | ColorInfo; // 定义一个类型别名，允许query是字符串或ColorInfo类型
+
 export interface SearchParams {
-  query: string;
+  query: QueryType; // 使用类型别名，使query能够兼容ColorInfo类型
   caseSensitive?: boolean;
   matchWholeWord?: boolean;
   type: TabName;
+  includeFills?: boolean; // 新增可选属性
+  includeStrokes?: boolean; // 新增可选属性
 }
 
 export interface ReplaceParams {
@@ -55,8 +59,8 @@ export interface HighlightParams {
 }
 
 export interface ColorInfo {
-  color: string; // HEX颜色值
-  fillCount: number;
-  strokeCount: number;
-  totalCount: number;
+  r: any; // HEX颜色值
+  g: any;
+  b: any;
+  a?: any | undefined;
 }

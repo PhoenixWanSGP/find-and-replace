@@ -178,58 +178,38 @@ if (figma.editorType === "figma") {
 
   async function collectColors(nodes: any) {
     await figma.loadAllPagesAsync(); // 确保所有页面都被加载
-    const colorMap = new Map();
-
-    function toHex(value: number): string {
-      const hex = Math.round(value * 255).toString(16);
-      return hex.length === 1 ? "0" + hex : hex; // 确保是两位数
-    }
-
-    function rgbaToHex(r: number, g: number, b: number, a: number): string {
-      return ("#" + toHex(r) + toHex(g) + toHex(b) + toHex(a)).toUpperCase();
-    }
+    const colorSet = new Set<{
+      color: { r: number; g: number; b: number; a: number };
+      key: string;
+    }>();
 
     function processNode(node: any) {
+      const addColor = (colorInfo: any, opacity: number) => {
+        const { r, g, b } = colorInfo;
+        const a = opacity !== undefined ? opacity : 1; // 如果未定义则默认为1
+        const rgbaObject = { r, g, b, a };
+        const rgbaString = `rgba(${r}, ${g}, ${b}, ${a})`; // 用于生成唯一字符串，以防止重复颜色
+        colorSet.add({ color: rgbaObject, key: rgbaString });
+      };
+
       if ("fills" in node && Array.isArray(node.fills)) {
         node.fills.forEach((fill: any) => {
           if (fill.type === "SOLID" && fill.visible !== false) {
-            const color = rgbaToHex(
-              fill.color.r,
-              fill.color.g,
-              fill.color.b,
-              fill.opacity || 1
-            );
-            let colorData = colorMap.get(color) || {
-              fillCount: 0,
-              strokeCount: 0,
-              totalCount: 0,
-            };
-            colorData.fillCount++;
-            colorData.totalCount++;
-            colorMap.set(color, colorData);
+            const opacity = fill.opacity !== undefined ? fill.opacity : 1; // 获取填充的透明度
+            addColor(fill.color, opacity); // 传入填充的透明度
           }
         });
       }
+
       if ("strokes" in node && Array.isArray(node.strokes)) {
         node.strokes.forEach((stroke: any) => {
           if (stroke.type === "SOLID" && stroke.visible !== false) {
-            const color = rgbaToHex(
-              stroke.color.r,
-              stroke.color.g,
-              stroke.color.b,
-              stroke.opacity || 1
-            );
-            let colorData = colorMap.get(color) || {
-              fillCount: 0,
-              strokeCount: 0,
-              totalCount: 0,
-            };
-            colorData.strokeCount++;
-            colorData.totalCount++;
-            colorMap.set(color, colorData);
+            const opacity = stroke.opacity !== undefined ? stroke.opacity : 1; // 获取描边的透明度
+            addColor(stroke.color, opacity); // 传入描边的透明度
           }
         });
       }
+
       if ("children" in node) {
         node.children.forEach(processNode);
       }
@@ -237,14 +217,35 @@ if (figma.editorType === "figma") {
 
     nodes.forEach(processNode);
 
-    return Array.from(colorMap).map(([color, data]) => {
-      return {
-        color: color, // HEX格式的颜色
-        fillCount: data.fillCount,
-        strokeCount: data.strokeCount,
-        totalCount: data.totalCount,
-      };
+    // 使用Map结构来确保颜色的唯一性，然后返回一个数组
+    const uniqueColors = new Map<
+      string,
+      { r: number; g: number; b: number; a: number }
+    >();
+    colorSet.forEach((item) => {
+      if (!uniqueColors.has(item.key)) {
+        uniqueColors.set(item.key, item.color);
+      }
     });
+
+    // 计算亮度
+    const brightness = (r: number, g: number, b: number) =>
+      r * 255 * 0.299 + g * 255 * 0.587 + b * 255 * 0.114;
+
+    // 将颜色由浅到深排序，并在 RGB 相同的情况下按透明度降序排列
+    const sortedColors = Array.from(uniqueColors.values()).sort(
+      (colorA, colorB) => {
+        const brightnessA = brightness(colorA.r, colorA.g, colorA.b);
+        const brightnessB = brightness(colorB.r, colorB.g, colorB.b);
+        if (brightnessA === brightnessB) {
+          // 如果亮度相同，则按透明度降序排列
+          return colorB.a - colorA.a;
+        }
+        return brightnessB - brightnessA; // 亮度大的颜色排在前面
+      }
+    );
+
+    return sortedColors;
   }
 
   figma.ui.onmessage = async (msg: Message) => {

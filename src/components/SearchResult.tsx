@@ -1,10 +1,10 @@
 import { FigmaComponentIcon, FigmaTextIcon } from "@/icons/FigmaIcons";
-import { ResultBaseNode } from "@/types";
+import { QueryType, ResultBaseNode } from "@/types";
 import React, { useEffect, useRef } from "react";
 
 interface ScrollAreaProps {
   searchResults: ResultBaseNode[];
-  query?: string;
+  query?: QueryType;
   currentTab: string;
   selectedNodeId?: string | null;
   onSelectNode: (id: string) => void;
@@ -35,12 +35,28 @@ const SearchResult: React.FC<ScrollAreaProps> = ({
     }
   }, [selectedNodeId]);
 
+  function queryToString(query: QueryType): string {
+    if (typeof query === "string") {
+      return query;
+    }
+    // 如果query是ColorInfo类型，转换为十六进制颜色字符串
+    // 这里需要一个实际的转换逻辑，下面是一个假设的示例
+    const { r, g, b, a } = query;
+    const alpha =
+      a !== undefined
+        ? Math.round(a * 255)
+            .toString(16)
+            .padStart(2, "0")
+        : "";
+    return `#${r}${g}${b}${alpha}`;
+  }
+
   function highlightText(
     text: string,
-    query?: string,
+    query?: QueryType,
     maxLength: number = 70
   ): React.ReactNode[] {
-    if (!query || query.trim() === "") {
+    if (!query) {
       return [
         <span key="text">
           {text.length > maxLength ? "..." + text.slice(-maxLength) : text}
@@ -48,14 +64,26 @@ const SearchResult: React.FC<ScrollAreaProps> = ({
       ];
     }
 
-    const parts = text.split(new RegExp(`(${query})`, "gi"));
+    // 使用辅助函数将query转换为字符串
+    const queryString = queryToString(query);
+
+    if (queryString.trim() === "") {
+      return [
+        <span key="text">
+          {text.length > maxLength ? "..." + text.slice(-maxLength) : text}
+        </span>,
+      ];
+    }
+
+    const parts = text.split(new RegExp(`(${queryString})`, "gi"));
     let highlighted: React.ReactNode[] = [];
     let currentLength = 0;
     let addedEllipsis = false;
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      const isQueryMatch = part.toLowerCase() === query.toLowerCase();
+      // 使用辅助函数将query转换为字符串，并进行小写比较
+      const isQueryMatch = part.toLowerCase() === queryString.toLowerCase();
 
       if (isQueryMatch) {
         // 如果是匹配的查询词，直接添加高亮显示
