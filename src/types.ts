@@ -35,7 +35,7 @@ export type TabData = {
     selectedIndex: number;
     searchResults: ResultBaseNode[];
     selectedNodeId: string | null;
-    searchList: any;
+    searchList?: any | null;
   };
 };
 
@@ -62,5 +62,5 @@ export interface ColorInfo {
   r: any; // HEX颜色值
   g: any;
   b: any;
-  a?: any | undefined;
+  a: any | undefined;
 }

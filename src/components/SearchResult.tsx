@@ -126,7 +126,13 @@ const SearchResult: React.FC<ScrollAreaProps> = ({
   return (
     <div
       ref={containerRef}
-      className="h-60 w-full mt-2 overflow-auto smooth-scroll"
+      style={{
+        height: currentTab === "color" ? "17.75rem" : "15rem",
+        width: "100%",
+        marginTop: "0.5rem",
+        overflow: "auto",
+      }}
+      className="smooth-scroll"
     >
       {searchResults.map((node, index) => (
         <div
@@ -149,7 +155,13 @@ const SearchResult: React.FC<ScrollAreaProps> = ({
             style={{ wordWrap: "break-word", whiteSpace: "pre-wrap" }}
           >
             {highlightText(
-              currentTab === "text" ? node.characters || "" : node.name || "",
+              currentTab === "text"
+                ? node.characters || ""
+                : currentTab === "layer"
+                ? node.name || ""
+                : currentTab === "color"
+                ? node.name || ""
+                : "",
               query
             )}
           </div>

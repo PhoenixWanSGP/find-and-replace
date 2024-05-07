@@ -54,7 +54,7 @@ const ColorScrollArea: React.FC<ColorScrollAreaProps> = ({
   };
 
   return (
-    <div className="h-44 w-[376px] overflow-auto smooth-scroll grid grid-cols-4 gap-1">
+    <div className="max-h-44 w-[376px] overflow-auto smooth-scroll grid grid-cols-4 gap-1 content-start">
       {colorData.map((colorInfo, index) => {
         const hexColor = rgbaToHex(colorInfo);
         const rgbaColorString = rgbaToString(colorInfo);

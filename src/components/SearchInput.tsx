@@ -12,6 +12,15 @@ interface SearchInputProps {
   activeTab: TabName; // 使用 TabName 类型
   colorData: ColorInfo[];
   onSelectColor: (color: string) => void;
+  handleRefreshColors: () => void;
+}
+
+interface CheckboxWithLabelProps {
+  id: string;
+  checked: boolean;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  name: string;
+  label: string;
 }
 
 const SearchInput: React.FC<SearchInputProps> = ({
@@ -21,9 +30,16 @@ const SearchInput: React.FC<SearchInputProps> = ({
   activeTab,
   colorData,
   onSelectColor,
+  handleRefreshColors,
 }) => {
-  const { query, type, caseSensitive, matchWholeWord } = searchParams;
-
+  const {
+    query,
+    type,
+    caseSensitive,
+    matchWholeWord,
+    includeFills,
+    includeStrokes,
+  } = searchParams;
   const handleColorSelect = (colorInfo: ColorInfo) => {
     // 更新父组件的searchParams中的query为选中的颜色信息
     onUpdateSearchParams({ query: colorInfo });
@@ -58,6 +74,33 @@ const SearchInput: React.FC<SearchInputProps> = ({
     return `#${r}${g}${b}${alpha}`;
   }
 
+  function CheckboxWithLabel({
+    id,
+    checked,
+    onChange,
+    name,
+    label,
+  }: CheckboxWithLabelProps) {
+    return (
+      <div className="flex justify-start space-x-1">
+        <input
+          type="checkbox"
+          id={id}
+          checked={checked}
+          onChange={onChange}
+          name={name}
+          className="form-checkbox w-4 h-4"
+        />
+        <label
+          htmlFor={id}
+          className="text-sm font-medium leading-4 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+        >
+          {label}
+        </label>
+      </div>
+    );
+  }
+
   const toHex = (value: number): string => {
     const hex = Math.round(value * 255)
       .toString(16)
@@ -65,23 +108,39 @@ const SearchInput: React.FC<SearchInputProps> = ({
       .toUpperCase();
     return hex;
   };
+
+  function getBrightness(r: number, g: number, b: number) {
+    // 根据加权计算颜色的亮度
+    return r * 255 * 0.299 + g * 255 * 0.587 + b * 255 * 0.114;
+  }
+
   const colorInfoToHexAndAlpha = (colorInfo?: ColorInfo) => {
     if (!colorInfo) {
-      // 当没有颜色信息时，默认显示“Select your color term”
-      return { hex: "#FFFFFF", displayText: "Select your color term" };
+      return {
+        rgba: "rgba(255, 255, 255, 1)",
+        hex: "#FFFFFF",
+        displayText: "Select your color term",
+        textColor: "#000000",
+      };
     }
     const { r, g, b, a = 1 } = colorInfo;
-    const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-    const alphaPercent = a < 1 ? `${Math.round(a * 100)}%` : "";
 
-    // 根据透明度构造显示文本
+    const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    const rgba = `rgba(${Math.round(r * 255)}, ${Math.round(
+      g * 255
+    )}, ${Math.round(b * 255)}, ${a.toFixed(2)})`;
+
+    const alphaPercent = a < 1 ? `${Math.round(a * 100)}%` : "";
+    const brightness = getBrightness(r, g, b);
+    const textColor = brightness > 128 ? "#000000" : "#FFFFFF";
+
     const displayText = alphaPercent ? `${hex} A: ${alphaPercent}` : hex;
 
-    return { hex, displayText };
+    return { rgba, hex, displayText, textColor };
   };
 
   // 在Button组件中使用displayText作为显示文本
-  const { hex, displayText } = colorInfoToHexAndAlpha(
+  const { rgba, displayText, textColor } = colorInfoToHexAndAlpha(
     searchParams.query as ColorInfo
   );
 
@@ -91,11 +150,14 @@ const SearchInput: React.FC<SearchInputProps> = ({
         {activeTab === TabNames.color ? (
           <Popover>
             <PopoverTrigger>
-              <Button className="w-72 border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:border-2 bg-white hover:bg-white border-dashed">
+              <Button
+                className="w-[282px] border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:border-2 bg-white hover:bg-white border-dashed"
+                onClick={handleRefreshColors}
+              >
                 <div className="flex items-center justify-center space-x-2">
                   <div
                     className="w-64 h-6 border-2 border-gray-500 border-opacity-20"
-                    style={{ backgroundColor: hex }}
+                    style={{ backgroundColor: rgba, color: textColor }}
                   >
                     <span>{displayText}</span>
                   </div>
@@ -131,41 +193,44 @@ const SearchInput: React.FC<SearchInputProps> = ({
         </Button>
       </div>
 
+      {/* Text 和 Layer Tabs 的处理 */}
       {(activeTab === TabNames.text || activeTab === TabNames.layer) && (
         <div className="flex justify-start w-full max-w-sm space-x-8 mt-2 mb-2 pl-3">
-          <div className="flex justify-start space-x-1">
-            <input
-              type="checkbox"
-              id="caseSensitiveCheckbox"
-              checked={caseSensitive}
-              onChange={handleChange}
-              name="caseSensitive"
-              className="form-checkbox w-4 h-4"
-            />
-            <label
-              htmlFor="caseSensitiveCheckbox"
-              className="text-sm font-medium leading-4 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Case sensitive
-            </label>
-          </div>
+          <CheckboxWithLabel
+            id="caseSensitiveCheckbox"
+            checked={caseSensitive ?? false} // 提供默认值
+            onChange={handleChange}
+            name="caseSensitive"
+            label="Case Sensitive"
+          />
 
-          <div className="flex justify-start space-x-1">
-            <input
-              type="checkbox"
-              id="matchWholeWordCheckbox"
-              checked={matchWholeWord}
-              onChange={handleChange}
-              name="matchWholeWord"
-              className="form-checkbox w-4 h-4"
-            />
-            <label
-              htmlFor="matchWholeWordCheckbox"
-              className="text-sm font-medium leading-4 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Match whole words
-            </label>
-          </div>
+          <CheckboxWithLabel
+            id="matchWholeWordCheckbox"
+            checked={matchWholeWord ?? false}
+            onChange={handleChange}
+            name="matchWholeWord"
+            label="Match Whole Words"
+          />
+        </div>
+      )}
+
+      {/* Color Tab 的额外选项 */}
+      {activeTab === TabNames.color && (
+        <div className="flex justify-start w-full max-w-sm space-x-8 mt-2 mb-2 pl-3">
+          <CheckboxWithLabel
+            id="includeFillsCheckbox"
+            checked={includeFills ?? true}
+            onChange={handleChange}
+            name="includeFills"
+            label="Find Fills"
+          />
+          <CheckboxWithLabel
+            id="includeStrokesCheckbox"
+            checked={includeStrokes ?? true}
+            onChange={handleChange}
+            name="includeStrokes"
+            label="Find Strokes"
+          />
         </div>
       )}
     </div>

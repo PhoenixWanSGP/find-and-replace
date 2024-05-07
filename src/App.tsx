@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  ColorInfo,
+  QueryType,
   ReplaceParams,
   SearchParams,
   TabData,
@@ -13,7 +15,7 @@ import ReplaceComponent from "./components/ReplaceComponent";
 import Footer from "./components/Footer";
 import SearchResult from "./components/SearchResult";
 import ResultsIndicator from "./components/ResultsIndicator";
-import { FaSync } from "react-icons/fa";
+import { Button } from "./components/ui/button";
 // import ColorScrollArea from "./components/ColorScrollArea";
 
 function App() {
@@ -44,7 +46,6 @@ function App() {
       selectedIndex: 0,
       searchResults: [],
       selectedNodeId: null,
-      searchList: [],
     },
     layer: {
       currentSearchParams: {
@@ -67,19 +68,16 @@ function App() {
       selectedIndex: 0,
       searchResults: [],
       selectedNodeId: null,
-      searchList: [],
     },
     color: {
       currentSearchParams: {
         type: "color",
         query: "",
-        caseSensitive: false,
-        matchWholeWord: false,
+        includeFills: true,
+        includeStrokes: true,
       },
       lastSearchParams: {
         query: "",
-        caseSensitive: false,
-        matchWholeWord: false,
         type: "color",
       },
       replaceParams: {
@@ -181,15 +179,40 @@ function App() {
 
   const handleSearch = (searchParams: SearchParams) => {
     const currentTabData = tabData[currentTab];
-    // 检查当前的搜索参数是否与上一次相同
+
+    // Helper function to compare ColorInfo objects
+    const isColorInfoEqual = (colorA: ColorInfo, colorB: ColorInfo) => {
+      return (
+        colorA.r === colorB.r &&
+        colorA.g === colorB.g &&
+        colorA.b === colorB.b &&
+        colorA.a === colorB.a
+      );
+    };
+
+    // Helper function to compare QueryType objects
+    const isQueryEqual = (queryA: QueryType, queryB: QueryType) => {
+      if (typeof queryA === "string" && typeof queryB === "string") {
+        return queryA === queryB;
+      } else if (typeof queryA === "object" && typeof queryB === "object") {
+        return isColorInfoEqual(queryA, queryB);
+      }
+      return false; // Different types
+    };
+
+    // Check if current search parameters are the same as the last ones
     if (
-      searchParams.query === currentTabData.lastSearchParams.query &&
+      isQueryEqual(searchParams.query, currentTabData.lastSearchParams.query) &&
       searchParams.caseSensitive ===
         currentTabData.lastSearchParams.caseSensitive &&
       searchParams.matchWholeWord ===
-        currentTabData.lastSearchParams.matchWholeWord
+        currentTabData.lastSearchParams.matchWholeWord &&
+      searchParams.includeFills ===
+        currentTabData.lastSearchParams.includeFills &&
+      searchParams.includeStrokes ===
+        currentTabData.lastSearchParams.includeStrokes
     ) {
-      // 进一步检查搜索结果是否非空
+      // Further check if search results are not empty
       if (currentTabData.searchResults.length > 0) {
         const newSelectedIndex =
           (currentTabData.selectedIndex + 1) %
@@ -205,7 +228,6 @@ function App() {
         updateSelectedNodeId(currentTab, newNodeId);
         setGlobalCurrentNode(newNodeId);
       } else {
-        // 如果搜索结果为空，可能需要显示一些消息或处理逻辑，例如：
         console.log("No search results available to cycle through.");
       }
     } else {
@@ -218,6 +240,8 @@ function App() {
               query: searchParams.query,
               caseSensitive: searchParams.caseSensitive,
               matchWholeWord: searchParams.matchWholeWord,
+              includeFills: searchParams.includeFills,
+              includeStrokes: searchParams.includeStrokes,
             },
           },
         },
@@ -307,6 +331,22 @@ function App() {
   const handleSelectColor = (color: string) => {
     console.log("Selected Color:", color);
     // 这里可以添加更多处理逻辑，比如更新状态或调用API等
+  };
+
+  const handleSelectAll = (currentTab: TabName) => {
+    const nodeIds = tabData[currentTab].searchResults.map((node) => node.id);
+    window.parent.postMessage(
+      {
+        pluginMessage: {
+          type: "select-all",
+          payload: {
+            nodeIds: nodeIds,
+            currentTab: currentTab,
+          },
+        },
+      },
+      "*"
+    ); // 注意安全性问题，实际部署时应该替换 "*"
   };
 
   useEffect(() => {
@@ -473,6 +513,7 @@ function App() {
               activeTab={currentTab} // 当前激活的 tab
               colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
               onSelectColor={handleSelectColor} // 处理颜色选择的函数
+              handleRefreshColors={handleRefreshColors}
             />
 
             <ReplaceComponent
@@ -501,6 +542,7 @@ function App() {
               activeTab={currentTab} // 当前激活的 tab
               colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
               onSelectColor={handleSelectColor} // 处理颜色选择的函数
+              handleRefreshColors={handleRefreshColors}
             />
 
             <ReplaceComponent
@@ -530,15 +572,36 @@ function App() {
               activeTab={currentTab} // 当前激活的 tab
               colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
               onSelectColor={handleSelectColor} // 处理颜色选择的函数
+              handleRefreshColors={handleRefreshColors}
+            />
+
+            <div className="w-full flex justify-end mt-2">
+              <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+              <div className="search-results-container">
+                {/* 其他内容... */}
+                {
+                  // 只有当当前标签的 searchResults 不为空时，才显示 "Select all" 按钮
+                  tabData[currentTab].searchResults.length > 0 && (
+                    <Button
+                      className="w-24 bg-blue-500 text-white hover:bg-blue-700 mr-1"
+                      onClick={() => handleSelectAll(currentTab)}
+                    >
+                      Select all
+                    </Button>
+                  )
+                }
+              </div>
+            </div>
+
+            <SearchResult
+              searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
+              query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
+              currentTab={currentTab} // 当前激活的标签页
+              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
+              onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
             />
 
             {/* Refresh button to trigger color data update */}
-            <button
-              className="py-2 px-3 bg-blue-500 text-white rounded hover:bg-blue-600"
-              onClick={handleRefreshColors}
-            >
-              <FaSync className="h-5 w-5" />
-            </button>
           </TabsContent>
 
           <TabsContent value="font"></TabsContent>

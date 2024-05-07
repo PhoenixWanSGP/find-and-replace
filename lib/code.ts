@@ -1,3 +1,5 @@
+import { ColorInfo, QueryType } from "@/types";
+
 if (figma.editorType === "figma") {
   figma.showUI(__html__, {
     height: 528,
@@ -18,21 +20,69 @@ if (figma.editorType === "figma") {
 
   function searchNodes(
     node: SceneNode | PageNode,
-    query: string,
+    query: QueryType,
     textCaseSensitive: boolean = false,
     textMatchWholeWord: boolean = false,
-    category: string
+    category: string,
+    includeFills: boolean = false,
+    includeStrokes: boolean = false
   ): any[] {
     const results: any[] = [];
-    const regex = new RegExp(
-      `${textMatchWholeWord ? "\\b" : ""}${query}${
-        textMatchWholeWord ? "\\b" : ""
-      }`,
-      textCaseSensitive ? "g" : "gi"
-    );
+
+    function isColorMatch(colorA: RGBA, colorB: RGBA): boolean {
+      return (
+        Math.abs(colorA.r - colorB.r) < 0.01 &&
+        Math.abs(colorA.g - colorB.g) < 0.01 &&
+        Math.abs(colorA.b - colorB.b) < 0.01 &&
+        Math.abs(colorA.a - colorB.a) < 0.01
+      );
+    }
 
     function traverse(node: SceneNode | PageNode) {
-      if (category === "text" && isTextNode(node)) {
+      if (category === "color" && (includeFills || includeStrokes)) {
+        const processColorProperty = (property: any[]) => {
+          property.forEach((item) => {
+            if (item.type === "SOLID" && item.visible !== false) {
+              const queryColor = query as ColorInfo; // 假定query已经是ColorInfo类型
+              const itemOpacity = item.opacity !== undefined ? item.opacity : 1;
+              if (
+                isColorMatch(
+                  {
+                    r: item.color.r,
+                    g: item.color.g,
+                    b: item.color.b,
+                    a: itemOpacity,
+                  },
+                  queryColor
+                )
+              ) {
+                results.push({
+                  id: node.id,
+                  type: node.type,
+                  name: node.name,
+                });
+              }
+            }
+          });
+        };
+
+        if (includeFills && "fills" in node && Array.isArray(node.fills)) {
+          processColorProperty(node.fills);
+        }
+        if (
+          includeStrokes &&
+          "strokes" in node &&
+          Array.isArray(node.strokes)
+        ) {
+          processColorProperty(node.strokes);
+        }
+      } else if (category === "text" && isTextNode(node)) {
+        const regex = new RegExp(
+          `${textMatchWholeWord ? "\\b" : ""}${query}${
+            textMatchWholeWord ? "\\b" : ""
+          }`,
+          textCaseSensitive ? "g" : "gi"
+        );
         if (
           regex.test(
             textCaseSensitive ? node.characters : node.characters.toLowerCase()
@@ -41,10 +91,17 @@ if (figma.editorType === "figma") {
           results.push({
             id: node.id,
             type: node.type,
+            name: node.name, // Assume nodes of type TEXT also have 'name'
             characters: node.characters,
           });
         }
       } else if (category === "layer" && node.type !== "TEXT") {
+        const regex = new RegExp(
+          `${textMatchWholeWord ? "\\b" : ""}${query}${
+            textMatchWholeWord ? "\\b" : ""
+          }`,
+          textCaseSensitive ? "g" : "gi"
+        );
         const nodeName = textCaseSensitive
           ? node.name
           : node.name.toLowerCase();
@@ -77,7 +134,6 @@ if (figma.editorType === "figma") {
 
       // 如果 nodeId 为空，则不执行创建高亮框的操作
       if (!nodeId) {
-        // console.log("No node ID provided, skipping highlight frame creation.");
         return;
       }
 
@@ -88,19 +144,27 @@ if (figma.editorType === "figma") {
         if (targetNode) {
           figma.viewport.scrollAndZoomIntoView([targetNode]);
 
-          const x = targetNode.absoluteTransform[0][2];
-          const y = targetNode.absoluteTransform[1][2];
+          // 设定高亮框的边距
+          const padding = 10; // 高亮框与节点边缘的距离（像素）
 
+          // 计算高亮框的位置和尺寸
+          const x = targetNode.absoluteTransform[0][2] - padding;
+          const y = targetNode.absoluteTransform[1][2] - padding;
+          const width = targetNode.width + padding * 2;
+          const height = targetNode.height + padding * 2;
+
+          // 创建并设置高亮框
           const highlightFrame = figma.createRectangle();
           highlightFrame.name = "Highlight Frame";
-          highlightFrame.resize(targetNode.width, targetNode.height);
+          highlightFrame.resize(width, height);
           highlightFrame.x = x;
           highlightFrame.y = y;
-          highlightFrame.fills = [];
+          highlightFrame.fills = []; // 无填充
           highlightFrame.strokes = [
             { type: "SOLID", color: { r: 1, g: 0, b: 0 } },
-          ];
-          highlightFrame.strokeWeight = 2;
+          ]; // 红色边框
+          highlightFrame.strokeWeight = 2; // 边框厚度
+          highlightFrame.strokeAlign = "OUTSIDE"; // 边框在矩形的外侧
           figma.currentPage.appendChild(highlightFrame);
         } else {
           console.error("No node found: ", nodeId);
@@ -110,6 +174,7 @@ if (figma.editorType === "figma") {
       console.error("Error in toggleHighlightFrame:", error);
     }
   }
+
   interface ModifiedNodeInfo {
     id: string;
     type: string;
@@ -248,30 +313,67 @@ if (figma.editorType === "figma") {
     return sortedColors;
   }
 
+  async function handleSelectAllNodes(payload: { nodeIds: any }) {
+    const { nodeIds } = payload;
+
+    // 异步获取所有节点，使用 getNodeByIdAsync 替代 getNodeById
+    const nodes = await Promise.all(
+      nodeIds.map(async (id: string) => {
+        try {
+          const node = await figma.getNodeByIdAsync(id);
+          return node;
+        } catch (error) {
+          console.error("Failed to retrieve node:", error);
+          return null;
+        }
+      })
+    ).then((results) => results.filter((node) => node !== null)); // 过滤掉未找到或获取失败的节点
+
+    // 检查获取的节点数量，如果为空则可能需要通知用户
+    if (nodes.length === 0) {
+      figma.notify("No nodes found with the provided IDs.");
+      return;
+    }
+
+    // 设置 Figma 的当前选区
+    figma.currentPage.selection = nodes;
+
+    // 将视图滚动到选中的节点
+    figma.viewport.scrollAndZoomIntoView(nodes);
+    figma.notify("Selected all specified nodes.");
+  }
+
   figma.ui.onmessage = async (msg: Message) => {
     switch (msg.type) {
       case "search":
         {
-          const { currentTab, query, caseSensitive, matchWholeWord } =
-            msg.payload;
-          if (!query) {
-            figma.ui.postMessage({
-              type: "search-results",
-              payload: { category: currentTab, data: [] },
-            });
-            return;
-          }
-
+          const {
+            currentTab,
+            query,
+            caseSensitive,
+            matchWholeWord,
+            includeFills,
+            includeStrokes,
+          } = msg.payload;
           const nodesToSearch = figma.currentPage.selection.length
             ? figma.currentPage.selection
             : [figma.currentPage];
           const searchResults = nodesToSearch.flatMap((node) =>
-            searchNodes(node, query, caseSensitive, matchWholeWord, currentTab)
+            searchNodes(
+              node,
+              query,
+              caseSensitive,
+              matchWholeWord,
+              currentTab,
+              includeFills,
+              includeStrokes
+            )
           );
           figma.ui.postMessage({
             type: "search-results",
             payload: { category: currentTab, data: searchResults },
           });
+          console.log("====搜索结果是====", currentTab, searchResults);
         }
         break;
 
@@ -393,6 +495,12 @@ if (figma.editorType === "figma") {
             data: colorsData,
           },
         });
+        break;
+
+      case "select-all":
+        console.log("后端收到信息:select-all", msg.payload);
+        handleSelectAllNodes(msg.payload);
+
         break;
 
       default:
