@@ -1,4 +1,4 @@
-import { ColorInfo, QueryType } from "@/types";
+import { ColorInfo, FontInfo, QueryType } from "@/types";
 
 if (figma.editorType === "figma") {
   figma.showUI(__html__, {
@@ -9,6 +9,14 @@ if (figma.editorType === "figma") {
   interface Message {
     type: string;
     payload: any;
+  }
+
+  enum TabName {
+    COLOR = "color",
+    FONT = "font",
+    INSTANCE = "instance",
+    STYLE = "style",
+    VARIABLE = "variable",
   }
 
   let inFigmaCurrentNode: string | null = null; // 存储全局节点ID
@@ -241,6 +249,36 @@ if (figma.editorType === "figma") {
     return modifiedNodes;
   }
 
+  async function handleSelectAllNodes(payload: { nodeIds: any }) {
+    const { nodeIds } = payload;
+
+    // 异步获取所有节点，使用 getNodeByIdAsync 替代 getNodeById
+    const nodes = await Promise.all(
+      nodeIds.map(async (id: string) => {
+        try {
+          const node = await figma.getNodeByIdAsync(id);
+          return node;
+        } catch (error) {
+          console.error("Failed to retrieve node:", error);
+          return null;
+        }
+      })
+    ).then((results) => results.filter((node) => node !== null)); // 过滤掉未找到或获取失败的节点
+
+    // 检查获取的节点数量，如果为空则可能需要通知用户
+    if (nodes.length === 0) {
+      figma.notify("No nodes found with the provided IDs.");
+      return;
+    }
+
+    // 设置 Figma 的当前选区
+    figma.currentPage.selection = nodes;
+
+    // 将视图滚动到选中的节点
+    figma.viewport.scrollAndZoomIntoView(nodes);
+    figma.notify("Selected all specified nodes.");
+  }
+
   async function collectColors(nodes: any) {
     await figma.loadAllPagesAsync(); // 确保所有页面都被加载
     const colorSet = new Set<{
@@ -313,34 +351,61 @@ if (figma.editorType === "figma") {
     return sortedColors;
   }
 
-  async function handleSelectAllNodes(payload: { nodeIds: any }) {
-    const { nodeIds } = payload;
+  async function collectFonts(nodes: any): Promise<FontInfo[]> {
+    // 查找所有文本节点，只在支持 findAll 方法的选中节点中查找
+    const textNodes = nodes.flatMap((node: any) =>
+      "findAll" in node ? node.findAll((n: any) => n.type === "TEXT") : []
+    ) as TextNode[];
 
-    // 异步获取所有节点，使用 getNodeByIdAsync 替代 getNodeById
-    const nodes = await Promise.all(
-      nodeIds.map(async (id: string) => {
-        try {
-          const node = await figma.getNodeByIdAsync(id);
-          return node;
-        } catch (error) {
-          console.error("Failed to retrieve node:", error);
-          return null;
+    // 收集字体信息并去重
+    const fontsUsed = textNodes
+      .map((node) => {
+        // 检查 fontName 是否为 FontName 类型
+        if (typeof node.fontName !== "symbol") {
+          return {
+            fontFamily: (node.fontName as FontName).family,
+            fontStyle: (node.fontName as FontName).style,
+            fontSize: node.fontSize,
+            isMissing: node.hasMissingFont,
+          };
         }
+        return undefined;
       })
-    ).then((results) => results.filter((node) => node !== null)); // 过滤掉未找到或获取失败的节点
+      .filter((fontInfo): fontInfo is FontInfo => fontInfo !== undefined)
+      .reduce<FontInfo[]>((uniqueFonts, fontInfo) => {
+        const fontExists = uniqueFonts.some(
+          (existingFont) =>
+            existingFont.fontFamily === fontInfo.fontFamily &&
+            existingFont.fontStyle === fontInfo.fontStyle &&
+            existingFont.fontSize === fontInfo.fontSize &&
+            existingFont.isMissing === fontInfo.isMissing
+        );
+        if (!fontExists) {
+          uniqueFonts.push(fontInfo);
+        }
+        return uniqueFonts;
+      }, []);
 
-    // 检查获取的节点数量，如果为空则可能需要通知用户
-    if (nodes.length === 0) {
-      figma.notify("No nodes found with the provided IDs.");
-      return;
-    }
+    // 排序字体信息
+    fontsUsed.sort((a, b) => {
+      // 首先按 isMissing 排序，isMissing 为 false 的排前面
+      if (a.isMissing === false && b.isMissing === true) return -1;
+      if (a.isMissing === true && b.isMissing === false) return 1;
 
-    // 设置 Figma 的当前选区
-    figma.currentPage.selection = nodes;
+      // 按 fontFamily 升序排序
+      if (a.fontFamily < b.fontFamily) return -1;
+      if (a.fontFamily > b.fontFamily) return 1;
 
-    // 将视图滚动到选中的节点
-    figma.viewport.scrollAndZoomIntoView(nodes);
-    figma.notify("Selected all specified nodes.");
+      // 如果 fontFamily 相同，则按 fontStyle 升序排序
+      if (a.fontStyle < b.fontStyle) return -1;
+      if (a.fontStyle > b.fontStyle) return 1;
+
+      // 如果 fontFamily 和 fontStyle 都相同，则按 fontSize 降序排序
+      // 注意：这里假设 fontSize 是数值类型
+      return b.fontSize - a.fontSize;
+    });
+
+    return fontsUsed;
   }
 
   figma.ui.onmessage = async (msg: Message) => {
@@ -482,25 +547,64 @@ if (figma.editorType === "figma") {
         // console.log("All replacements done and results sent back to the UI.");
         break;
 
-      case "get-all-colors":
-        console.log("后端收到信息:get-all-colors");
-        const nodesToInspect =
-          figma.currentPage.selection.length > 0
-            ? figma.currentPage.selection
-            : [figma.currentPage];
-        const colorsData = await collectColors(nodesToInspect);
-        figma.ui.postMessage({
-          type: "color-results",
-          payload: {
-            data: colorsData,
-          },
-        });
-        break;
-
       case "select-all":
         console.log("后端收到信息:select-all", msg.payload);
         handleSelectAllNodes(msg.payload);
 
+        break;
+
+      case "get-searchlist":
+        console.log(
+          `后端收到信息: get-searchlist for tab ${msg.payload.currentTab}`
+        );
+        try {
+          let results;
+          const nodesToProcess =
+            figma.currentPage.selection.length > 0
+              ? figma.currentPage.selection
+              : [figma.currentPage];
+
+          switch (msg.payload.currentTab) {
+            case TabName.COLOR:
+              const colorsData = await collectColors(nodesToProcess);
+              results = {
+                type: "searchlist",
+                payload: {
+                  dataType: "color-results",
+                  data: colorsData,
+                },
+              };
+              break;
+
+            case TabName.FONT:
+              const fontsData = await collectFonts(nodesToProcess);
+              results = {
+                type: "searchlist",
+                payload: {
+                  dataType: "font-results",
+                  data: fontsData,
+                },
+              };
+              break;
+
+            // ... (处理其他 TabName 的 case)
+
+            default:
+              throw new Error(`Unsupported tab: ${msg.payload.currentTab}`);
+          }
+
+          figma.ui.postMessage(results);
+        } catch (error) {
+          console.error("Error processing search list:", error);
+          // 发送错误消息到 UI
+          figma.ui.postMessage({
+            type: "searchlist",
+            payload: {
+              dataType: "error",
+              data: {},
+            },
+          });
+        }
         break;
 
       default:

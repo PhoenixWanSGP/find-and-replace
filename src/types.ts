@@ -6,6 +6,8 @@ export const TabNames = {
   color: "color",
   font: "font",
   instance: "instance",
+  style: "style",
+  variable: "variable",
 } as const;
 
 export type TabName = keyof typeof TabNames;
@@ -54,13 +56,33 @@ export interface SearchResults {
   data: ResultBaseNode[]; // 使用BaseNode数组来存储所有类型的节点
 }
 
-export interface HighlightParams {
-  nodeId: string;
+export interface ColorInfo {
+  r: number; // HEX颜色值
+  g: number;
+  b: number;
+  a: any | undefined;
 }
 
-export interface ColorInfo {
-  r: any; // HEX颜色值
-  g: any;
-  b: any;
-  a: any | undefined;
+export interface FontInfo {
+  fontFamily: string;
+  fontStyle: string;
+  fontSize: number;
+  isMissing: boolean;
+}
+
+export interface ComponentInfo {
+  id: string;
+  name: string;
+}
+
+export interface StyleInfo {
+  id: string;
+  type: string;
+  name: string;
+}
+
+export interface VariableInfo {
+  id: string;
+  type: string;
+  name: string;
 }

@@ -128,6 +128,44 @@ function App() {
       selectedNodeId: null,
       searchList: [],
     },
+    style: {
+      currentSearchParams: {
+        type: "style",
+        query: "",
+      },
+      lastSearchParams: {
+        query: "",
+        type: "style",
+      },
+      replaceParams: {
+        type: "style",
+        nodeId: "",
+        newValue: "",
+      },
+      selectedIndex: 0,
+      searchResults: [],
+      selectedNodeId: null,
+      searchList: [],
+    },
+    variable: {
+      currentSearchParams: {
+        type: "variable",
+        query: "",
+      },
+      lastSearchParams: {
+        query: "",
+        type: "variable",
+      },
+      replaceParams: {
+        type: "variable",
+        nodeId: "",
+        newValue: "",
+      },
+      selectedIndex: 0,
+      searchResults: [],
+      selectedNodeId: null,
+      searchList: [],
+    },
   });
 
   const updateSearchParams =
@@ -320,8 +358,21 @@ function App() {
     parent.postMessage(
       {
         pluginMessage: {
-          type: "get-all-colors",
-          payload: {},
+          type: "get-searchlist",
+          payload: { currentTab },
+        },
+      },
+      "*"
+    );
+  };
+
+  const handleButtonClick = () => {
+    // 发送消息到 Figma 主线程
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "get-searchlist",
+          payload: { currentTab },
         },
       },
       "*"
@@ -395,17 +446,21 @@ function App() {
             }
             break;
 
-          case "color-results":
-            // 用提供的颜色数据更新color标签下的searchList
-            console.log("====收到所有颜色====", payload.data);
-            setTabData((prev) => ({
-              ...prev,
-              color: {
-                ...prev.color,
-                searchList: payload.data,
-              },
-            }));
-            // console.log("====存好所有颜色====", tabData.color.searchList);
+          case "searchlist":
+            if (payload.dataType === "color-results") {
+              // 用提供的颜色数据更新color标签下的searchList
+              console.log("====收到所有颜色====", payload.data);
+              setTabData((prev) => ({
+                ...prev,
+                color: {
+                  ...prev.color,
+                  searchList: payload.data,
+                },
+              }));
+              // console.log("====存好所有颜色====", tabData.color.searchList);
+            } else if (payload.dataType === "font-results") {
+              console.log("====收到所有字体====", payload.data);
+            }
             break;
         }
       }
@@ -493,7 +548,7 @@ function App() {
     <>
       <div className="flex flex-col items-center w-full fixed top-0 left-0">
         <Tabs defaultValue="text" className="w-full flex flex-col items-center">
-          <TabsList className="grid w-full grid-cols-5 rounded-none">
+          <TabsList className="grid w-full grid-cols-7 rounded-none">
             {Object.values(TabNames).map((tab) => (
               <TabsTrigger
                 key={tab}
@@ -604,8 +659,13 @@ function App() {
             {/* Refresh button to trigger color data update */}
           </TabsContent>
 
-          <TabsContent value="font"></TabsContent>
+          <TabsContent value="font">
+            <Button onClick={handleButtonClick}>获取所有字体</Button>
+          </TabsContent>
+
           <TabsContent value="instance"></TabsContent>
+          <TabsContent value="style"></TabsContent>
+          <TabsContent value="variable"></TabsContent>
         </Tabs>
         <Footer />
       </div>
