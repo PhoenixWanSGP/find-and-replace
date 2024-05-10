@@ -1,4 +1,10 @@
-import { ColorInfo, FontInfo, QueryType } from "@/types";
+import {
+  ColorInfo,
+  ComponentInfo,
+  FontInfo,
+  QueryType,
+  StyleInfo,
+} from "@/types";
 
 if (figma.editorType === "figma") {
   figma.showUI(__html__, {
@@ -14,7 +20,7 @@ if (figma.editorType === "figma") {
   enum TabName {
     COLOR = "color",
     FONT = "font",
-    INSTANCE = "instance",
+    COMPONENT = "instance",
     STYLE = "style",
     VARIABLE = "variable",
   }
@@ -365,7 +371,7 @@ if (figma.editorType === "figma") {
           return {
             fontFamily: (node.fontName as FontName).family,
             fontStyle: (node.fontName as FontName).style,
-            fontSize: node.fontSize,
+            // fontSize: node.fontSize,
             isMissing: node.hasMissingFont,
           };
         }
@@ -377,7 +383,7 @@ if (figma.editorType === "figma") {
           (existingFont) =>
             existingFont.fontFamily === fontInfo.fontFamily &&
             existingFont.fontStyle === fontInfo.fontStyle &&
-            existingFont.fontSize === fontInfo.fontSize &&
+            // existingFont.fontSize === fontInfo.fontSize &&
             existingFont.isMissing === fontInfo.isMissing
         );
         if (!fontExists) {
@@ -400,12 +406,96 @@ if (figma.editorType === "figma") {
       if (a.fontStyle < b.fontStyle) return -1;
       if (a.fontStyle > b.fontStyle) return 1;
 
-      // 如果 fontFamily 和 fontStyle 都相同，则按 fontSize 降序排序
-      // 注意：这里假设 fontSize 是数值类型
-      return b.fontSize - a.fontSize;
+      // 所有排序条件都相同，返回0
+      return 0;
     });
 
     return fontsUsed;
+  }
+
+  async function collectComponents(nodes: any): Promise<ComponentInfo[]> {
+    // 查找所有组件节点，只在支持 findAll 方法的选中节点中查找
+    const componentNodes = nodes.flatMap((node: any) =>
+      "findAll" in node
+        ? node.findAll(
+            (n: any) => n.type === "COMPONENT" || n.type === "COMPONENT_SET"
+          )
+        : []
+    ) as (ComponentNode | ComponentSetNode)[]; // 使用更具体的类型代替 SceneNode
+
+    // 收集组件信息并去重
+    const componentsUsed = componentNodes
+      .map((node) => {
+        return {
+          id: node.id,
+          name: node.name,
+          description: "description" in node ? node.description : "", // 使用类型守卫来检查 description 属性是否存在
+        };
+      })
+      .reduce<ComponentInfo[]>((uniqueComponents, componentInfo) => {
+        const componentExists = uniqueComponents.some(
+          (existingComponent) => existingComponent.id === componentInfo.id
+        );
+        if (!componentExists) {
+          uniqueComponents.push(componentInfo);
+        }
+        return uniqueComponents;
+      }, []);
+
+    // 对组件信息进行排序，先按 name 升序排序
+    componentsUsed.sort((a, b) => a.name.localeCompare(b.name));
+
+    return componentsUsed;
+  }
+
+  async function collectStyles(): Promise<StyleInfo[]> {
+    const paintStyles = await figma.getLocalPaintStylesAsync();
+    const textStyles = await figma.getLocalTextStylesAsync();
+
+    const stylesUsed: StyleInfo[] = [];
+
+    // 收集绘画样式
+    paintStyles.forEach((style) => {
+      stylesUsed.push({
+        id: style.id,
+        styleType: "PaintStyle", // 明确指定为 'PaintStyle'
+        name: style.name,
+        description: style.description || "",
+        properties: {
+          colors: style.paints
+            .map((paint: SolidPaint | GradientPaint | ImagePaint | any) => {
+              if (paint.type === "SOLID") {
+                // 注意：对于填充颜色，透明度通常是颜色属性的一部分
+                return {
+                  r: paint.color.r,
+                  g: paint.color.g,
+                  b: paint.color.b,
+                  a: paint.opacity || 1,
+                };
+              }
+              return null; // 只处理 SOLID 类型的颜色
+            })
+            .filter((color: any) => color !== null),
+        },
+      });
+    });
+
+    // 收集文本样式
+    textStyles.forEach((style) => {
+      stylesUsed.push({
+        id: style.id,
+        styleType: "TextStyle", // 明确指定为 'TextStyle'
+        name: style.name,
+        description: style.description || "",
+        properties: {
+          fontFamily: style.fontName.family,
+          fontSize: style.fontSize,
+          lineHeight: style.lineHeight,
+        },
+      });
+    });
+
+    return stylesUsed;
   }
 
   figma.ui.onmessage = async (msg: Message) => {
@@ -583,6 +673,28 @@ if (figma.editorType === "figma") {
                 payload: {
                   dataType: "font-results",
                   data: fontsData,
+                },
+              };
+              break;
+
+            case TabName.COMPONENT:
+              const componentsData = await collectComponents(nodesToProcess);
+              results = {
+                type: "searchlist",
+                payload: {
+                  dataType: "component-results",
+                  data: componentsData,
+                },
+              };
+              break;
+
+            case TabName.STYLE:
+              const stylesData = await collectStyles();
+              results = {
+                type: "searchlist",
+                payload: {
+                  dataType: "style-results",
+                  data: stylesData,
                 },
               };
               break;

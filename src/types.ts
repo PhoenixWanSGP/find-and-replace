@@ -7,12 +7,16 @@ export const TabNames = {
   font: "font",
   instance: "instance",
   style: "style",
-  variable: "variable",
 } as const;
 
 export type TabName = keyof typeof TabNames;
 
-export type QueryType = string | ColorInfo; // 定义一个类型别名，允许query是字符串或ColorInfo类型
+export type QueryType =
+  | string
+  | ColorInfo
+  | FontInfo
+  | ComponentInfo
+  | StyleInfo; // 定义一个类型别名，允许query是字符串或ColorInfo类型
 
 export interface SearchParams {
   query: QueryType; // 使用类型别名，使query能够兼容ColorInfo类型
@@ -73,12 +77,15 @@ export interface FontInfo {
 export interface ComponentInfo {
   id: string;
   name: string;
+  description: string;
 }
 
 export interface StyleInfo {
   id: string;
-  type: string;
+  styleType: "PaintStyle" | "TextStyle";
   name: string;
+  description: string;
+  properties: any;
 }
 
 export interface VariableInfo {

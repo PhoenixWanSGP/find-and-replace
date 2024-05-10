@@ -10,6 +10,19 @@ interface ScrollAreaProps {
   onSelectNode: (id: string) => void;
 }
 
+// const isColorInfo = (object: any): object is ColorInfo => {
+//   return (
+//     object &&
+//     "r" in object &&
+//     "g" in object &&
+//     "b" in object &&
+//     // 'a' in object 可选，因为a可能是undefined
+//     typeof object.r === "number" &&
+//     typeof object.g === "number" &&
+//     typeof object.b === "number"
+//   );
+// };
+
 const SearchResult: React.FC<ScrollAreaProps> = ({
   searchResults,
   query,
@@ -38,17 +51,27 @@ const SearchResult: React.FC<ScrollAreaProps> = ({
   function queryToString(query: QueryType): string {
     if (typeof query === "string") {
       return query;
+    } else if ("r" in query && "g" in query && "b" in query) {
+      // 假设ColorInfo类型有r, g, b属性，且它们是数字类型
+      const { r, g, b, a = 1 } = query; // 如果a是undefined，默认为1
+      // 将r, g, b, a转换为十六进制颜色字符串
+      const toHex = (value: number): string => {
+        const hex = Math.round(value * 255)
+          .toString(16)
+          .padStart(2, "0")
+          .toUpperCase();
+        return hex;
+      };
+      const alphaHex = a !== 1 ? toHex(a) : "";
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}${alphaHex}`;
     }
-    // 如果query是ColorInfo类型，转换为十六进制颜色字符串
-    // 这里需要一个实际的转换逻辑，下面是一个假设的示例
-    const { r, g, b, a } = query;
-    const alpha =
-      a !== undefined
-        ? Math.round(a * 255)
-            .toString(16)
-            .padStart(2, "0")
-        : "";
-    return `#${r}${g}${b}${alpha}`;
+    // 如果query是其他类型，根据具体情况处理
+    // 例如，如果query是FontInfo类型，你可能会返回字体家族名称
+    // 这里需要根据你的应用逻辑来添加代码
+    // ...
+
+    // 如果无法处理query，则返回一个默认的字符串
+    return "N/A";
   }
 
   function highlightText(

@@ -147,25 +147,6 @@ function App() {
       selectedNodeId: null,
       searchList: [],
     },
-    variable: {
-      currentSearchParams: {
-        type: "variable",
-        query: "",
-      },
-      lastSearchParams: {
-        query: "",
-        type: "variable",
-      },
-      replaceParams: {
-        type: "variable",
-        nodeId: "",
-        newValue: "",
-      },
-      selectedIndex: 0,
-      searchResults: [],
-      selectedNodeId: null,
-      searchList: [],
-    },
   });
 
   const updateSearchParams =
@@ -228,14 +209,20 @@ function App() {
       );
     };
 
+    const isColorInfo = (object: any): object is ColorInfo => {
+      return object && "r" in object && "g" in object && "b" in object;
+    };
+
     // Helper function to compare QueryType objects
     const isQueryEqual = (queryA: QueryType, queryB: QueryType) => {
       if (typeof queryA === "string" && typeof queryB === "string") {
         return queryA === queryB;
-      } else if (typeof queryA === "object" && typeof queryB === "object") {
+      } else if (isColorInfo(queryA) && isColorInfo(queryB)) {
+        // 现在我们确定queryA和queryB都是ColorInfo类型，可以安全地调用isColorInfoEqual
         return isColorInfoEqual(queryA, queryB);
       }
-      return false; // Different types
+      // 如果需要，这里可以添加更多的逻辑来处理FontInfo, ComponentInfo, StyleInfo等类型的比较
+      return false; // 不同的类型或无法比较的类型
     };
 
     // Check if current search parameters are the same as the last ones
@@ -384,6 +371,11 @@ function App() {
     // 这里可以添加更多处理逻辑，比如更新状态或调用API等
   };
 
+  const handleSelectFont = (font: any) => {
+    console.log("Selected Font:", font);
+    // 这里可以添加更多处理逻辑，比如更新状态或调用API等
+  };
+
   const handleSelectAll = (currentTab: TabName) => {
     const nodeIds = tabData[currentTab].searchResults.map((node) => node.id);
     window.parent.postMessage(
@@ -404,6 +396,7 @@ function App() {
     function handleFigmaMessages(event: any) {
       if (event.data.pluginMessage) {
         const { type, payload } = event.data.pluginMessage;
+        console.log("====type is:====", type, "====payload is:====", payload);
         switch (type) {
           case "search-results":
             const { category, data } = payload;
@@ -460,6 +453,17 @@ function App() {
               // console.log("====存好所有颜色====", tabData.color.searchList);
             } else if (payload.dataType === "font-results") {
               console.log("====收到所有字体====", payload.data);
+              setTabData((prev) => ({
+                ...prev,
+                font: {
+                  ...prev.font,
+                  searchList: payload.data,
+                },
+              }));
+            } else if (payload.dataType === "component-results") {
+              console.log("====收到所有组件====", payload.data);
+            } else if (payload.dataType === "style-results") {
+              console.log("====收到所有样式====", payload.data);
             }
             break;
         }
@@ -529,7 +533,7 @@ function App() {
   useEffect(() => {
     // 此 useEffect 用于监听 tabData 下所有标签的 searchList 的变化
     // 对于本示例，我们暂时仅处理 color 标签
-    console.log("SearchList has been updated", tabData.color.searchList);
+    console.log("SearchList has been updated", tabData.font.searchList);
   }, [
     tabData.color.searchList,
     tabData.font.searchList,
@@ -548,7 +552,7 @@ function App() {
     <>
       <div className="flex flex-col items-center w-full fixed top-0 left-0">
         <Tabs defaultValue="text" className="w-full flex flex-col items-center">
-          <TabsList className="grid w-full grid-cols-7 rounded-none">
+          <TabsList className="grid w-full grid-cols-6 rounded-none">
             {Object.values(TabNames).map((tab) => (
               <TabsTrigger
                 key={tab}
@@ -660,12 +664,26 @@ function App() {
           </TabsContent>
 
           <TabsContent value="font">
+            <SearchInput
+              searchParams={tabData.font.currentSearchParams} // 获取 text 类型的搜索参数
+              onSearch={() => handleSearch(tabData.font.currentSearchParams)} // 进行搜索
+              onUpdateSearchParams={updateSearchParams("font")} // 更新搜索参数
+              activeTab={currentTab} // 当前激活的 tab
+              fontData={tabData.font.searchList} // 使用 tabData 中的 color 数据
+              onSelectFont={handleSelectFont} // 处理颜色选择的函数
+              handleRefreshFonts={handleRefreshColors}
+            />
             <Button onClick={handleButtonClick}>获取所有字体</Button>
           </TabsContent>
 
-          <TabsContent value="instance"></TabsContent>
-          <TabsContent value="style"></TabsContent>
-          <TabsContent value="variable"></TabsContent>
+          <TabsContent value="instance">
+            <Button onClick={handleButtonClick}>获取所有组件</Button>
+          </TabsContent>
+          <TabsContent value="style">
+            <Button onClick={handleButtonClick}>获取所有样式</Button>
+          </TabsContent>
+
+          {/* <TabsContent value="variable"></TabsContent> */}
         </Tabs>
         <Footer />
       </div>
