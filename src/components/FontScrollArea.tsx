@@ -4,7 +4,7 @@ import { FigmaComponentIcon, FigmaTextIcon } from "@/icons/FigmaIcons";
 
 interface FontScrollAreaProps {
   fontData: FontInfo[];
-  onSelectFont: (font: string) => void;
+  onSelectFont: (fontInfo: FontInfo) => void; // 修改这里的类型说明
   onFontSelect: (fontInfo: FontInfo) => void; // 新增回调函数属性
 }
 
@@ -24,13 +24,9 @@ const FontScrollArea: React.FC<FontScrollAreaProps> = ({
       selectedFont &&
       selectedFont.fontFamily === fontInfo.fontFamily &&
       selectedFont.fontStyle === fontInfo.fontStyle;
-    setSelectedFont(
-      isAlreadySelected
-        ? null
-        : { fontFamily: fontInfo.fontFamily, fontStyle: fontInfo.fontStyle }
-    );
-    onSelectFont(fontInfo.fontFamily); // 如果需要将字体的字符串表示发送给父组件
-    onFontSelect(fontInfo); // 将字体对应的FontInfo数据传递给父组件
+    setSelectedFont(isAlreadySelected ? null : fontInfo);
+    onSelectFont(fontInfo); // 直接传递整个FontInfo对象给父组件
+    onFontSelect(fontInfo); // 保持这个调用，如果还需要这个回调的话
   };
 
   return (
@@ -50,22 +46,28 @@ const FontScrollArea: React.FC<FontScrollAreaProps> = ({
                 : "border-2 border-gray-500 border-opacity-20"
             }`}
             onClick={() => handleSelectFont(fontInfo)}
-            style={{ height: "50px" }} // 设置统一的高度
+            style={{ height: "50px" }}
           >
-            {fontInfo.isMissing ? (
-              <FigmaTextIcon width="20" height="20" fillColor="black" />
-            ) : (
-              <FigmaComponentIcon width="20" height="20" fillColor="black" />
-            )}
-            <div className="flex flex-col justify-start">
-              <span className={`text-left ${textColorClass}`}>
+            <div style={{ flexShrink: 0 }}>
+              {" "}
+              {/* 图标容器，防止图标被压缩 */}
+              {fontInfo.isMissing ? (
+                <FigmaTextIcon width="20" height="20" fillColor="black" />
+              ) : (
+                <FigmaComponentIcon width="20" height="20" fillColor="black" />
+              )}
+            </div>
+            <div className="flex flex-col justify-start text-sm w-full overflow-hidden">
+              {" "}
+              {/* 文本容器，允许文本填充剩余空间 */}
+              <span className={`truncate text-left ${textColorClass}`}>
                 {fontInfo.fontFamily}
-              </span>{" "}
+              </span>
               <span
-                className={`text-xs text-left text-gray-400 ${textColorClass}`}
+                className={`text-xs text-left text-gray-400 truncate ${textColorClass}`}
               >
                 {fontInfo.fontStyle}
-              </span>{" "}
+              </span>
             </div>
           </div>
         );

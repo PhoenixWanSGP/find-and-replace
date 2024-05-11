@@ -376,6 +376,11 @@ function App() {
     // 这里可以添加更多处理逻辑，比如更新状态或调用API等
   };
 
+  const handleSelectComponent = (component: any) => {
+    console.log("Selected Component:", component);
+    // 这里可以添加更多处理逻辑，比如更新状态或调用API等
+  };
+
   const handleSelectAll = (currentTab: TabName) => {
     const nodeIds = tabData[currentTab].searchResults.map((node) => node.id);
     window.parent.postMessage(
@@ -462,6 +467,13 @@ function App() {
               }));
             } else if (payload.dataType === "component-results") {
               console.log("====收到所有组件====", payload.data);
+              setTabData((prev) => ({
+                ...prev,
+                instance: {
+                  ...prev.instance,
+                  searchList: payload.data,
+                },
+              }));
             } else if (payload.dataType === "style-results") {
               console.log("====收到所有样式====", payload.data);
             }
@@ -673,10 +685,20 @@ function App() {
               onSelectFont={handleSelectFont} // 处理颜色选择的函数
               handleRefreshFonts={handleRefreshColors}
             />
-            <Button onClick={handleButtonClick}>获取所有字体</Button>
           </TabsContent>
 
           <TabsContent value="instance">
+            <SearchInput
+              searchParams={tabData.instance.currentSearchParams} // 获取 text 类型的搜索参数
+              onSearch={() =>
+                handleSearch(tabData.instance.currentSearchParams)
+              } // 进行搜索
+              onUpdateSearchParams={updateSearchParams("instance")} // 更新搜索参数
+              activeTab={currentTab} // 当前激活的 tab
+              componentData={tabData.instance.searchList} // 使用 tabData 中的 color 数据
+              onSelectComponent={handleSelectComponent} // 处理颜色选择的函数
+              handleRefreshComponents={handleRefreshColors}
+            />
             <Button onClick={handleButtonClick}>获取所有组件</Button>
           </TabsContent>
           <TabsContent value="style">

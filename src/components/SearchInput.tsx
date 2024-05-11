@@ -1,10 +1,19 @@
 import React, { ChangeEvent, KeyboardEvent } from "react";
-import { SearchParams, TabName, TabNames, ColorInfo, FontInfo } from "@/types"; // 确保路径正确
+import {
+  SearchParams,
+  TabName,
+  TabNames,
+  ColorInfo,
+  FontInfo,
+  ComponentInfo,
+} from "@/types"; // 确保路径正确
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
 import ColorScrollArea from "./ColorScrollArea"; // 确保路径正确
 import FontScrollArea from "./FontScrollArea";
+import { FigmaComponentIcon, FigmaTextIcon } from "@/icons/FigmaIcons";
+import ComponentScrollArea from "./ComponentScrollArea";
 
 interface SearchInputProps {
   searchParams: SearchParams;
@@ -15,8 +24,11 @@ interface SearchInputProps {
   onSelectColor?: (color: string) => void;
   handleRefreshColors?: () => void;
   fontData?: FontInfo[]; // 新增属性
-  onSelectFont?: (fontFamily: string) => void; // 新增属性
+  onSelectFont?: (fontInfo: FontInfo) => void; // 新增属性
   handleRefreshFonts?: () => void; // 新增属性
+  componentData?: ComponentInfo[]; // 新增属性
+  onSelectComponent?: (componentInfo: ComponentInfo) => void; // 新增属性
+  handleRefreshComponents?: () => void; // 新增属性
 }
 
 interface CheckboxWithLabelProps {
@@ -37,7 +49,10 @@ const SearchInput: React.FC<SearchInputProps> = ({
   handleRefreshColors,
   fontData,
   onSelectFont,
+  componentData,
+  onSelectComponent,
   handleRefreshFonts,
+  handleRefreshComponents,
 }) => {
   const {
     query,
@@ -52,8 +67,12 @@ const SearchInput: React.FC<SearchInputProps> = ({
     onUpdateSearchParams({ query: colorInfo });
   };
   const handleFontSelect = (fontInfo: FontInfo) => {
-    // 更新父组件的searchParams中的query为选中的字体信息
+    // 更新searchParams中的query为选中的FontInfo对象
     onUpdateSearchParams({ query: fontInfo });
+  };
+  const handleComponentSelect = (componentInfo: ComponentInfo) => {
+    // 更新父组件的searchParams中的query为选中的ComponentInfo对象
+    onUpdateSearchParams({ query: componentInfo });
   };
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -155,13 +174,9 @@ const SearchInput: React.FC<SearchInputProps> = ({
     searchParams.query as ColorInfo
   );
 
-  const getFontDisplayText = (query: any) => {
-    // 检查query是否是一个对象并且包含fontFamily属性
-    if (typeof query === "object" && query !== null && "fontFamily" in query) {
-      return query.fontFamily;
-    }
-    // 如果不是，返回默认文本
-    return "Select Font";
+  const getFontDisplayText = (fontInfo: FontInfo) => {
+    if (!fontInfo) return "Select Font";
+    return `${fontInfo.fontFamily} ${fontInfo.fontStyle}`;
   };
 
   return (
@@ -203,12 +218,34 @@ const SearchInput: React.FC<SearchInputProps> = ({
                 onClick={handleRefreshFonts}
               >
                 <div className="flex items-center justify-center space-x-2">
-                  {/* 这里可以添加显示选中的字体信息 */}
-                  {/* 示例： */}
-                  <span>{getFontDisplayText(searchParams.query)}</span>
+                  {typeof searchParams.query === "object" &&
+                  searchParams.query !== null &&
+                  "fontFamily" in searchParams.query ? (
+                    <>
+                      {searchParams.query.isMissing ? (
+                        <FigmaTextIcon
+                          width="20"
+                          height="20"
+                          fillColor="black"
+                        />
+                      ) : (
+                        <FigmaComponentIcon
+                          width="20"
+                          height="20"
+                          fillColor="black"
+                        />
+                      )}
+                      <span>
+                        {getFontDisplayText(searchParams.query as FontInfo)}
+                      </span>
+                    </>
+                  ) : (
+                    <span>Select Font</span>
+                  )}
                 </div>
               </Button>
             </PopoverTrigger>
+
             <PopoverContent className="w-96 ml-2 p-1">
               <FontScrollArea
                 fontData={fontData || []}
@@ -217,6 +254,29 @@ const SearchInput: React.FC<SearchInputProps> = ({
               />
               <div className="text-sm text-center p-1 mt-2 bg-orange-100 border border-orange-300 rounded-md shadow">
                 Select from the fonts used in your current selection.
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : activeTab === TabNames.instance ? (
+          <Popover>
+            <PopoverTrigger>
+              <Button
+                className="w-[282px] border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:border-2 bg-white hover:bg-white border-dashed"
+                onClick={handleRefreshComponents}
+              >
+                <div className="flex items-center justify-center">
+                  <span>Select Component</span>
+                </div>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-96 ml-2 p-1">
+              <ComponentScrollArea
+                componentData={componentData || []}
+                onSelectComponent={onSelectComponent || (() => {})}
+                onComponentSelect={handleComponentSelect}
+              />
+              <div className="text-sm text-center p-1 mt-2 bg-orange-100 border border-orange-300 rounded-md shadow">
+                Select from the components used in your current selection.
               </div>
             </PopoverContent>
           </Popover>
