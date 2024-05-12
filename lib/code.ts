@@ -32,7 +32,7 @@ if (figma.editorType === "figma") {
     return node.type === "TEXT";
   }
 
-  function searchNodes(
+  async function searchNodes(
     node: SceneNode | PageNode,
     query: QueryType,
     textCaseSensitive: boolean = false,
@@ -41,11 +41,11 @@ if (figma.editorType === "figma") {
     includeFills: boolean = false,
     includeStrokes: boolean = false,
     includeNormalFont: boolean = false,
-    includeMissingFont: boolean = false
-    // includeNormalComponent: boolean = false,
+    includeMissingFont: boolean = false,
+    includeNormalComponent: boolean = false,
     // includeMissingComponent: boolean = false,
-    // includeExternalComponent: boolean = false
-  ): any[] {
+    includeExternalComponent: boolean = false
+  ): Promise<any[]> {
     const results: any[] = [];
 
     function isColorMatch(colorA: RGBA, colorB: RGBA): boolean {
@@ -57,8 +57,50 @@ if (figma.editorType === "figma") {
       );
     }
 
-    function traverse(node: SceneNode | PageNode) {
-      if (category === "color" && (includeFills || includeStrokes)) {
+    async function traverse(node: SceneNode | PageNode) {
+      // console.log("Current node:", node.id, node.name, node.type); // 输出当前节点信息
+
+      if (category === "instance" && node.type === "INSTANCE") {
+        let mainComponent = null;
+        try {
+          mainComponent = await node.getMainComponentAsync();
+          if (mainComponent) {
+            // 确保 mainComponent 不是 null
+            console.log(
+              "Main Component:",
+              mainComponent.id,
+              mainComponent.name
+            ); // 输出主组件信息
+          } else {
+            console.log("Main Component is null"); // 主组件为 null 时的处理
+          }
+        } catch (error) {
+          console.error("Error getting main component:", error);
+        }
+
+        const queryComponent = query as ComponentInfo;
+        if (mainComponent) {
+          const isExternal = mainComponent.remote;
+          const componentMatch = mainComponent.id === queryComponent.id;
+
+          if (componentMatch) {
+            const result = {
+              id: node.id,
+              name: node.name,
+              type: node.type,
+              mainComponentId: mainComponent ? mainComponent.id : "null", // 避免 mainComponent 为 null 时导致的错误
+              isExternal: isExternal,
+            };
+            console.log("Matching node:", result); // 输出匹配节点信息
+
+            if (isExternal && includeExternalComponent) {
+              results.push(result);
+            } else if (!isExternal && includeNormalComponent) {
+              results.push(result);
+            }
+          }
+        }
+      } else if (category === "color" && (includeFills || includeStrokes)) {
         const processColorProperty = (property: any[]) => {
           property.forEach((item) => {
             if (item.type === "SOLID" && item.visible !== false) {
@@ -152,12 +194,14 @@ if (figma.editorType === "figma") {
         }
       }
 
-      if ("children" in node) {
-        (node.children as SceneNode[]).forEach(traverse);
+      if ("children" in node && node.children) {
+        for (let child of node.children) {
+          await traverse(child);
+        }
       }
     }
 
-    traverse(node);
+    await traverse(node);
     return results;
   }
 
@@ -626,34 +670,43 @@ if (figma.editorType === "figma") {
             includeStrokes,
             includeNormalFont,
             includeMissingFont,
-            // includeNormalComponent,
+            includeNormalComponent,
             // includeMissingComponent,
-            // includeExternalComponent,
+            includeExternalComponent,
           } = msg.payload;
           const nodesToSearch = figma.currentPage.selection.length
             ? figma.currentPage.selection
             : [figma.currentPage];
-          const searchResults = nodesToSearch.flatMap((node) =>
-            searchNodes(
-              node,
-              query,
-              caseSensitive,
-              matchWholeWord,
-              currentTab,
-              includeFills,
-              includeStrokes,
-              includeNormalFont,
-              includeMissingFont
-              // includeNormalComponent,
-              // includeMissingComponent,
-              // includeExternalComponent
+
+          // 使用 Promise.all 来等待所有的异步操作完成
+          const searchResults = await Promise.all(
+            nodesToSearch.map((node) =>
+              searchNodes(
+                node,
+                query,
+                caseSensitive,
+                matchWholeWord,
+                currentTab,
+                includeFills,
+                includeStrokes,
+                includeNormalFont,
+                includeMissingFont,
+                includeNormalComponent,
+                // includeMissingComponent,
+                includeExternalComponent
+              )
             )
           );
+
+          // 使用 flat() 来平铺结果数组
+          const flatSearchResults = searchResults.flat();
+
           figma.ui.postMessage({
             type: "search-results",
-            payload: { category: currentTab, data: searchResults },
+            payload: { category: currentTab, data: flatSearchResults },
           });
-          console.log("====搜索结果是====", currentTab, searchResults);
+
+          console.log("====搜索结果是====", currentTab, flatSearchResults);
         }
         break;
 

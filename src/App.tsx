@@ -3,6 +3,7 @@ import "./App.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ColorInfo,
+  ComponentInfo,
   FontInfo,
   QueryType,
   ReplaceParams,
@@ -236,6 +237,30 @@ function App() {
       );
     };
 
+    const isComponentInfo = (object: any): object is ComponentInfo => {
+      return (
+        object &&
+        "id" in object &&
+        "name" in object &&
+        "description" in object &&
+        "isMissing" in object &&
+        "isExternal" in object
+      );
+    };
+
+    const isComponentEqual = (
+      componentA: ComponentInfo,
+      componentB: ComponentInfo
+    ) => {
+      return (
+        componentA.id === componentB.id &&
+        componentA.name === componentB.name &&
+        componentA.description === componentB.description &&
+        componentA.isMissing === componentB.isMissing &&
+        componentA.isExternal === componentB.isExternal
+      );
+    };
+
     // Helper function to compare QueryType objects
     const isQueryEqual = (queryA: QueryType, queryB: QueryType) => {
       if (typeof queryA === "string" && typeof queryB === "string") {
@@ -244,6 +269,8 @@ function App() {
         return isColorInfoEqual(queryA, queryB);
       } else if (isFontInfo(queryA) && isFontInfo(queryB)) {
         return isFontInfoEqual(queryA, queryB);
+      } else if (isComponentInfo(queryA) && isComponentInfo(queryB)) {
+        return isComponentEqual(queryA, queryB);
       }
       // 如果需要，这里可以添加更多的逻辑来处理其他类型的比较
       return false; // 不同的类型或无法比较的类型
@@ -714,7 +741,7 @@ function App() {
             {/* Refresh button to trigger color data update */}
           </TabsContent>
 
-          <TabsContent value="font">
+          <TabsContent value="font" className="flex flex-col items-center m-0">
             <SearchInput
               searchParams={tabData.font.currentSearchParams} // 获取 text 类型的搜索参数
               onSearch={() => handleSearch(tabData.font.currentSearchParams)} // 进行搜索
@@ -754,7 +781,10 @@ function App() {
             />
           </TabsContent>
 
-          <TabsContent value="instance">
+          <TabsContent
+            value="instance"
+            className="flex flex-col items-center m-0"
+          >
             <SearchInput
               searchParams={tabData.instance.currentSearchParams} // 获取 text 类型的搜索参数
               onSearch={() =>
@@ -767,6 +797,31 @@ function App() {
               handleRefreshComponents={() =>
                 handleRefreshSearchList(tabData.instance.currentSearchParams)
               }
+            />
+            <div className="w-full flex justify-end mt-2">
+              <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+              <div className="search-results-container">
+                {/* 其他内容... */}
+                {
+                  // 只有当当前标签的 searchResults 不为空时，才显示 "Select all" 按钮
+                  tabData[currentTab].searchResults.length > 0 && (
+                    <Button
+                      className="w-24 bg-blue-500 text-white hover:bg-blue-700 mr-1"
+                      onClick={() => handleSelectAll(currentTab)}
+                    >
+                      Select all
+                    </Button>
+                  )
+                }
+              </div>
+            </div>
+
+            <SearchResult
+              searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
+              query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
+              currentTab={currentTab} // 当前激活的标签页
+              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
+              onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
             />
           </TabsContent>
           {/* <TabsContent value="style">

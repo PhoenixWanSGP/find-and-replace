@@ -10,19 +10,6 @@ interface ScrollAreaProps {
   onSelectNode: (id: string) => void;
 }
 
-// const isColorInfo = (object: any): object is ColorInfo => {
-//   return (
-//     object &&
-//     "r" in object &&
-//     "g" in object &&
-//     "b" in object &&
-//     // 'a' in object 可选，因为a可能是undefined
-//     typeof object.r === "number" &&
-//     typeof object.g === "number" &&
-//     typeof object.b === "number"
-//   );
-// };
-
 const SearchResult: React.FC<ScrollAreaProps> = ({
   searchResults,
   query,
@@ -188,6 +175,8 @@ const SearchResult: React.FC<ScrollAreaProps> = ({
                 ? node.name || ""
                 : currentTab === "font"
                 ? node.characters || ""
+                : currentTab === "instance"
+                ? node.name || ""
                 : "",
               query
             )}
