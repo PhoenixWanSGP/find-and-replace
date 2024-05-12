@@ -6,7 +6,7 @@ export const TabNames = {
   color: "color",
   font: "font",
   instance: "instance",
-  style: "style",
+  // style: "style",
 } as const;
 
 export type TabName = keyof typeof TabNames;
@@ -23,8 +23,13 @@ export interface SearchParams {
   caseSensitive?: boolean;
   matchWholeWord?: boolean;
   type: TabName;
-  includeFills?: boolean; // 新增可选属性
-  includeStrokes?: boolean; // 新增可选属性
+  includeFills?: boolean;
+  includeStrokes?: boolean;
+  includeNormalFont?: boolean;
+  includeMissingFont?: boolean;
+  includeNormalComponent?: boolean;
+  includeMissingComponent?: boolean;
+  includeExternalComponent?: boolean;
 }
 
 export interface ReplaceParams {
@@ -70,7 +75,7 @@ export interface ColorInfo {
 export interface FontInfo {
   fontFamily: string;
   fontStyle: string;
-  fontSize: number;
+  // fontSize: number;
   isMissing: boolean;
 }
 
@@ -78,6 +83,8 @@ export interface ComponentInfo {
   id: string;
   name: string;
   description: string;
+  isMissing?: boolean;
+  isExternal?: boolean | undefined | null | "";
 }
 
 export interface StyleInfo {
@@ -86,6 +93,8 @@ export interface StyleInfo {
   name: string;
   description: string;
   properties: any;
+  isMissing?: boolean;
+  isExternal?: boolean;
 }
 
 export interface VariableInfo {

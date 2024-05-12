@@ -1,11 +1,15 @@
 import React, { useState } from "react";
-import { ComponentInfo } from "@/types"; // 请确保路径正确
-import { FigmaComponentIcon } from "@/icons/FigmaIcons";
+import { ComponentInfo } from "@/types";
+import {
+  FigmaComponentIcon,
+  FigmaTextIcon,
+  FigmaMaskIcon,
+} from "@/icons/FigmaIcons";
 
 interface ComponentScrollAreaProps {
   componentData: ComponentInfo[];
   onSelectComponent: (componentInfo: ComponentInfo) => void;
-  onComponentSelect: (componentInfo: ComponentInfo) => void; // 用于选择时的回调函数
+  onComponentSelect: (componentInfo: ComponentInfo) => void;
 }
 
 const ComponentScrollArea: React.FC<ComponentScrollAreaProps> = ({
@@ -13,7 +17,6 @@ const ComponentScrollArea: React.FC<ComponentScrollAreaProps> = ({
   onSelectComponent,
   onComponentSelect,
 }) => {
-  // 使用一个对象来存储选中的组件ID
   const [selectedComponent, setSelectedComponent] =
     useState<ComponentInfo | null>(null);
 
@@ -21,16 +24,31 @@ const ComponentScrollArea: React.FC<ComponentScrollAreaProps> = ({
     const isAlreadySelected =
       selectedComponent && selectedComponent.id === componentInfo.id;
     setSelectedComponent(isAlreadySelected ? null : componentInfo);
-    onSelectComponent(componentInfo); // 直接传递整个ComponentInfo对象给父组件
-    onComponentSelect(componentInfo); // 如果还需要这个回调的话
+    onSelectComponent(componentInfo);
+    onComponentSelect(componentInfo);
   };
 
   return (
     <div className="max-h-44 w-[376px] overflow-auto smooth-scroll grid grid-cols-2 gap-1 content-start">
       {componentData.map((componentInfo, index) => {
-        const textColorClass = "text-black"; // 根据情况设置文本颜色
         const isSelected =
           selectedComponent && selectedComponent.id === componentInfo.id;
+        // const textColorClass = componentInfo.isMissing
+        //   ? "text-orange-500"
+        //   : componentInfo.isExternal
+        //   ? "text-blue-500"
+        //     : "text-black";
+
+        const textColorClass = "text-black";
+
+        // const descriptionColorClass = componentInfo.isMissing
+        //   ? "text-orange-300" // 使用较浅的橙色
+        //   : componentInfo.isExternal
+        //   ? "text-blue-300" // 使用较浅的蓝色
+        //     : "text-gray-400"; // 默认较浅的灰色
+
+        const descriptionColorClass = "text-gray-400";
+
         return (
           <div
             key={index}
@@ -43,14 +61,20 @@ const ComponentScrollArea: React.FC<ComponentScrollAreaProps> = ({
             style={{ height: "50px" }}
           >
             <div style={{ flexShrink: 0 }}>
-              <FigmaComponentIcon width="20" height="20" fillColor="black" />
+              {componentInfo.isMissing ? (
+                <FigmaTextIcon width="20" height="20" fillColor="black" />
+              ) : componentInfo.isExternal ? (
+                <FigmaMaskIcon width="20" height="20" fillColor="black" />
+              ) : (
+                <FigmaComponentIcon width="20" height="20" fillColor="black" />
+              )}
             </div>
             <div className="flex flex-col justify-start text-sm w-full overflow-hidden">
               <span className={`truncate text-left ${textColorClass}`}>
                 {componentInfo.name}
               </span>
               <span
-                className={`text-xs text-left text-gray-400 truncate ${textColorClass}`}
+                className={`text-xs text-left truncate ${descriptionColorClass}`}
               >
                 {componentInfo.description}
               </span>

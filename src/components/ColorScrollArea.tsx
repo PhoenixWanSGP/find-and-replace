@@ -67,7 +67,7 @@ const ColorScrollArea: React.FC<ColorScrollAreaProps> = ({
             key={index}
             className={`flex flex-col justify-center items-center rounded-lg cursor-pointer ${
               selectedColor === rgbaColorString
-                ? "border-2 border-red-500"
+                ? "border-2 border-blue-500"
                 : "border-2 border-gray-500 border-opacity-20"
             }`}
             onClick={() => handleSelectColor(colorInfo)}

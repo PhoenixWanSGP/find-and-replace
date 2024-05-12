@@ -18,7 +18,11 @@ const ResultsIndicator: React.FC<ResultsIndicatorProps> = ({
 
   return (
     <div
-      style={{ top: currentTab === "color" ? "144px" : "188px" }}
+      style={{
+        top: ["color", "font", "instance"].includes(currentTab)
+          ? "144px"
+          : "188px",
+      }}
       className="absolute left-3 text-gray-800 text-left text-sm font-medium"
     >
       <span>

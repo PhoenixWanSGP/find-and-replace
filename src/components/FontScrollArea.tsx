@@ -32,17 +32,29 @@ const FontScrollArea: React.FC<FontScrollAreaProps> = ({
   return (
     <div className="max-h-44 w-[376px] overflow-auto smooth-scroll grid grid-cols-2 gap-1 content-start">
       {fontData.map((fontInfo, index) => {
-        const textColorClass = "text-black"; // 根据颜色亮度设置文本颜色
+        // const textColorClass = "text-black"; // 根据颜色亮度设置文本颜色
         const isSelected =
           selectedFont &&
           selectedFont.fontFamily === fontInfo.fontFamily &&
           selectedFont.fontStyle === fontInfo.fontStyle;
+
+        // const textColorClass = fontInfo.isMissing
+        //   ? "text-orange-500"
+        //   : "text-black";
+
+        const textColorClass = "text-black";
+
+        // const styleColorClass = fontInfo.isMissing
+        //   ? "text-orange-300" // 使用较浅的橙色
+        //   : "text-gray-400"; // 默认较浅的灰色
+
+        const styleColorClass = "text-gray-400";
         return (
           <div
             key={index}
             className={`flex justify-start items-center rounded-sm cursor-pointer space-x-2 pl-2 ${
               isSelected
-                ? "border-2 border-red-500"
+                ? "border-2 border-blue-500"
                 : "border-2 border-gray-500 border-opacity-20"
             }`}
             onClick={() => handleSelectFont(fontInfo)}
@@ -63,9 +75,7 @@ const FontScrollArea: React.FC<FontScrollAreaProps> = ({
               <span className={`truncate text-left ${textColorClass}`}>
                 {fontInfo.fontFamily}
               </span>
-              <span
-                className={`text-xs text-left text-gray-400 truncate ${textColorClass}`}
-              >
+              <span className={`text-xs text-left truncate ${styleColorClass}`}>
                 {fontInfo.fontStyle}
               </span>
             </div>

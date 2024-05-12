@@ -150,7 +150,9 @@ const SearchResult: React.FC<ScrollAreaProps> = ({
     <div
       ref={containerRef}
       style={{
-        height: currentTab === "color" ? "17.75rem" : "15rem",
+        height: ["color", "font", "instance"].includes(currentTab)
+          ? "17.75rem"
+          : "15rem",
         width: "100%",
         marginTop: "0.5rem",
         overflow: "auto",
@@ -184,6 +186,8 @@ const SearchResult: React.FC<ScrollAreaProps> = ({
                 ? node.name || ""
                 : currentTab === "color"
                 ? node.name || ""
+                : currentTab === "font"
+                ? node.characters || ""
                 : "",
               query
             )}

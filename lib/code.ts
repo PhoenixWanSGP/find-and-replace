@@ -39,7 +39,12 @@ if (figma.editorType === "figma") {
     textMatchWholeWord: boolean = false,
     category: string,
     includeFills: boolean = false,
-    includeStrokes: boolean = false
+    includeStrokes: boolean = false,
+    includeNormalFont: boolean = false,
+    includeMissingFont: boolean = false
+    // includeNormalComponent: boolean = false,
+    // includeMissingComponent: boolean = false,
+    // includeExternalComponent: boolean = false
   ): any[] {
     const results: any[] = [];
 
@@ -105,9 +110,32 @@ if (figma.editorType === "figma") {
           results.push({
             id: node.id,
             type: node.type,
-            name: node.name, // Assume nodes of type TEXT also have 'name'
+            name: node.name,
             characters: node.characters,
           });
+        }
+      } else if (category === "font" && isTextNode(node)) {
+        // 增加处理字体搜索的逻辑
+        if (typeof node.fontName !== "symbol") {
+          // 确认fontName不是unique symbol
+          const fontFamily = node.fontName.family;
+          const fontStyle = node.fontName.style;
+          const isMissing = node.hasMissingFont;
+          const queryFont = query as FontInfo; // 假定query已经是FontInfo类型
+
+          if (
+            fontFamily === queryFont.fontFamily &&
+            fontStyle === queryFont.fontStyle &&
+            ((isMissing && includeMissingFont) ||
+              (!isMissing && includeNormalFont))
+          ) {
+            results.push({
+              id: node.id,
+              type: node.type,
+              name: node.name,
+              characters: node.characters,
+            });
+          }
         }
       } else if (category === "layer" && node.type !== "TEXT") {
         const regex = new RegExp(
@@ -285,7 +313,11 @@ if (figma.editorType === "figma") {
     figma.notify("Selected all specified nodes.");
   }
 
-  async function collectColors(nodes: any) {
+  async function collectColors(
+    nodes: any,
+    includeFills: boolean,
+    includeStrokes: boolean
+  ) {
     await figma.loadAllPagesAsync(); // 确保所有页面都被加载
     const colorSet = new Set<{
       color: { r: number; g: number; b: number; a: number };
@@ -301,7 +333,7 @@ if (figma.editorType === "figma") {
         colorSet.add({ color: rgbaObject, key: rgbaString });
       };
 
-      if ("fills" in node && Array.isArray(node.fills)) {
+      if ("fills" in node && Array.isArray(node.fills) && includeFills) {
         node.fills.forEach((fill: any) => {
           if (fill.type === "SOLID" && fill.visible !== false) {
             const opacity = fill.opacity !== undefined ? fill.opacity : 1; // 获取填充的透明度
@@ -310,7 +342,7 @@ if (figma.editorType === "figma") {
         });
       }
 
-      if ("strokes" in node && Array.isArray(node.strokes)) {
+      if ("strokes" in node && Array.isArray(node.strokes) && includeStrokes) {
         node.strokes.forEach((stroke: any) => {
           if (stroke.type === "SOLID" && stroke.visible !== false) {
             const opacity = stroke.opacity !== undefined ? stroke.opacity : 1; // 获取描边的透明度
@@ -357,7 +389,11 @@ if (figma.editorType === "figma") {
     return sortedColors;
   }
 
-  async function collectFonts(nodes: any): Promise<FontInfo[]> {
+  async function collectFonts(
+    nodes: any,
+    includeNormalFont: boolean,
+    includeMissingFont: boolean
+  ): Promise<FontInfo[]> {
     // 查找所有文本节点，只在支持 findAll 方法的选中节点中查找
     const textNodes = nodes.flatMap((node: any) =>
       "findAll" in node ? node.findAll((n: any) => n.type === "TEXT") : []
@@ -377,7 +413,12 @@ if (figma.editorType === "figma") {
         }
         return undefined;
       })
-      .filter((fontInfo): fontInfo is FontInfo => fontInfo !== undefined)
+      .filter(
+        (fontInfo): fontInfo is FontInfo =>
+          fontInfo !== undefined &&
+          ((fontInfo.isMissing && includeMissingFont) ||
+            (!fontInfo.isMissing && includeNormalFont))
+      )
       .reduce<FontInfo[]>((uniqueFonts, fontInfo) => {
         const fontExists = uniqueFonts.some(
           (existingFont) =>
@@ -413,37 +454,111 @@ if (figma.editorType === "figma") {
     return fontsUsed;
   }
 
-  async function collectComponents(nodes: any): Promise<ComponentInfo[]> {
-    // 查找所有组件节点，只在支持 findAll 方法的选中节点中查找
+  async function collectComponents(nodes: any[]): Promise<ComponentInfo[]> {
+    console.log("开始查找组件节点");
     const componentNodes = nodes.flatMap((node: any) =>
       "findAll" in node
         ? node.findAll(
             (n: any) => n.type === "COMPONENT" || n.type === "COMPONENT_SET"
           )
         : []
-    ) as (ComponentNode | ComponentSetNode)[]; // 使用更具体的类型代替 SceneNode
+    ) as (ComponentNode | ComponentSetNode)[];
 
-    // 收集组件信息并去重
-    const componentsUsed = componentNodes
-      .map((node) => {
-        return {
+    console.log(`找到组件节点数量: ${componentNodes.length}`);
+
+    // 收集当前页面所有组件的 ID
+    const currentPageComponentIds = new Set(
+      componentNodes.map((comp: any) => comp.id)
+    );
+
+    const componentsUsed: ComponentInfo[] = [];
+
+    console.log("开始检查实例及其主组件");
+    const allInstances = figma.currentPage.findAll(
+      (n: any) => n.type === "INSTANCE"
+    );
+    console.log(`总实例数量: ${allInstances.length}`);
+    for (const instance of allInstances) {
+      if ("getMainComponentAsync" in instance) {
+        const mainComponent = await instance.getMainComponentAsync();
+        if (mainComponent) {
+          let isMissing = false;
+          let isExternal = false;
+
+          if (!currentPageComponentIds.has(mainComponent.id)) {
+            // 如果 ID 不在当前页面
+            isMissing = true; // 默认标记为 missing
+            if (mainComponent.remote) {
+              // 如果 remote 为 true，重新标记
+              isMissing = false;
+              isExternal = true;
+            }
+          } else if (!mainComponent.parent) {
+            // 如果 ID 在当前页面但 parent 不存在
+            isMissing = true;
+          }
+
+          const componentToAdd = {
+            id: mainComponent.id,
+            name: mainComponent.name,
+            description: mainComponent.description || "No description",
+            isMissing,
+            isExternal,
+          };
+
+          // 添加前进行去重检查
+          if (
+            !componentsUsed.some(
+              (component) => component.id === mainComponent.id
+            )
+          ) {
+            componentsUsed.push(componentToAdd);
+          }
+        } else {
+          console.log(`实例 ${instance.id} 的主组件为null`);
+          // 添加特殊 missing-main-component 节点
+          const specialComponentId = "missing-main-component";
+          if (
+            !componentsUsed.some(
+              (component) => component.id === specialComponentId
+            )
+          ) {
+            componentsUsed.push({
+              id: specialComponentId,
+              name: "Missing Main Component",
+              description: "This instance has no main component.",
+              isMissing: true,
+              isExternal: false,
+            });
+          }
+        }
+      }
+    }
+
+    console.log("开始收集其他组件信息并去重");
+    componentNodes.forEach((node) => {
+      if (!componentsUsed.some((component) => component.id === node.id)) {
+        componentsUsed.push({
           id: node.id,
           name: node.name,
-          description: "description" in node ? node.description : "", // 使用类型守卫来检查 description 属性是否存在
-        };
-      })
-      .reduce<ComponentInfo[]>((uniqueComponents, componentInfo) => {
-        const componentExists = uniqueComponents.some(
-          (existingComponent) => existingComponent.id === componentInfo.id
-        );
-        if (!componentExists) {
-          uniqueComponents.push(componentInfo);
-        }
-        return uniqueComponents;
-      }, []);
+          description: "description" in node ? node.description : "",
+          isMissing: false,
+          isExternal: false,
+        });
+      }
+    });
 
-    // 对组件信息进行排序，先按 name 升序排序
-    componentsUsed.sort((a, b) => a.name.localeCompare(b.name));
+    console.log(`收集到的组件信息数量: ${componentsUsed.length}`);
+    // 更新排序逻辑
+    componentsUsed.sort((a, b) => {
+      if (!a.isMissing && b.isMissing) return -1;
+      if (a.isMissing && !b.isMissing) return 1;
+      if (!a.isExternal && b.isExternal) return -1;
+      if (a.isExternal && !b.isExternal) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    console.log("组件信息排序完成");
+    console.log("====componentsUsed is:====", componentsUsed);
 
     return componentsUsed;
   }
@@ -509,6 +624,11 @@ if (figma.editorType === "figma") {
             matchWholeWord,
             includeFills,
             includeStrokes,
+            includeNormalFont,
+            includeMissingFont,
+            // includeNormalComponent,
+            // includeMissingComponent,
+            // includeExternalComponent,
           } = msg.payload;
           const nodesToSearch = figma.currentPage.selection.length
             ? figma.currentPage.selection
@@ -521,7 +641,12 @@ if (figma.editorType === "figma") {
               matchWholeWord,
               currentTab,
               includeFills,
-              includeStrokes
+              includeStrokes,
+              includeNormalFont,
+              includeMissingFont
+              // includeNormalComponent,
+              // includeMissingComponent,
+              // includeExternalComponent
             )
           );
           figma.ui.postMessage({
@@ -647,6 +772,7 @@ if (figma.editorType === "figma") {
         console.log(
           `后端收到信息: get-searchlist for tab ${msg.payload.currentTab}`
         );
+        console.log("====开始获取searchlist====", msg.payload);
         try {
           let results;
           const nodesToProcess =
@@ -656,7 +782,11 @@ if (figma.editorType === "figma") {
 
           switch (msg.payload.currentTab) {
             case TabName.COLOR:
-              const colorsData = await collectColors(nodesToProcess);
+              const colorsData = await collectColors(
+                nodesToProcess,
+                msg.payload.includeFills,
+                msg.payload.includeStrokes
+              );
               results = {
                 type: "searchlist",
                 payload: {
@@ -667,7 +797,11 @@ if (figma.editorType === "figma") {
               break;
 
             case TabName.FONT:
-              const fontsData = await collectFonts(nodesToProcess);
+              const fontsData = await collectFonts(
+                nodesToProcess,
+                msg.payload.includeNormalFont,
+                msg.payload.includeMissingFont
+              );
               results = {
                 type: "searchlist",
                 payload: {
@@ -678,7 +812,10 @@ if (figma.editorType === "figma") {
               break;
 
             case TabName.COMPONENT:
-              const componentsData = await collectComponents(nodesToProcess);
+              // 总是从当前页面的所有节点中收集组件信息
+              const componentsData = await collectComponents([
+                figma.currentPage,
+              ]);
               results = {
                 type: "searchlist",
                 payload: {

@@ -3,6 +3,7 @@ import "./App.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ColorInfo,
+  FontInfo,
   QueryType,
   ReplaceParams,
   SearchParams,
@@ -94,6 +95,8 @@ function App() {
       currentSearchParams: {
         type: "font",
         query: "",
+        includeNormalFont: true,
+        includeMissingFont: true,
       },
       lastSearchParams: {
         query: "",
@@ -113,6 +116,9 @@ function App() {
       currentSearchParams: {
         type: "instance",
         query: "",
+        includeNormalComponent: true,
+        includeMissingComponent: true,
+        includeExternalComponent: true,
       },
       lastSearchParams: {
         query: "",
@@ -128,25 +134,25 @@ function App() {
       selectedNodeId: null,
       searchList: [],
     },
-    style: {
-      currentSearchParams: {
-        type: "style",
-        query: "",
-      },
-      lastSearchParams: {
-        query: "",
-        type: "style",
-      },
-      replaceParams: {
-        type: "style",
-        nodeId: "",
-        newValue: "",
-      },
-      selectedIndex: 0,
-      searchResults: [],
-      selectedNodeId: null,
-      searchList: [],
-    },
+    // style: {
+    //   currentSearchParams: {
+    //     type: "style",
+    //     query: "",
+    //   },
+    //   lastSearchParams: {
+    //     query: "",
+    //     type: "style",
+    //   },
+    //   replaceParams: {
+    //     type: "style",
+    //     nodeId: "",
+    //     newValue: "",
+    //   },
+    //   selectedIndex: 0,
+    //   searchResults: [],
+    //   selectedNodeId: null,
+    //   searchList: [],
+    // },
   });
 
   const updateSearchParams =
@@ -213,15 +219,33 @@ function App() {
       return object && "r" in object && "g" in object && "b" in object;
     };
 
+    const isFontInfo = (object: any): object is FontInfo => {
+      return (
+        object &&
+        "fontFamily" in object &&
+        "fontStyle" in object &&
+        "isMissing" in object
+      );
+    };
+
+    const isFontInfoEqual = (fontA: FontInfo, fontB: FontInfo) => {
+      return (
+        fontA.fontFamily === fontB.fontFamily &&
+        fontA.fontStyle === fontB.fontStyle &&
+        fontA.isMissing === fontB.isMissing
+      );
+    };
+
     // Helper function to compare QueryType objects
     const isQueryEqual = (queryA: QueryType, queryB: QueryType) => {
       if (typeof queryA === "string" && typeof queryB === "string") {
         return queryA === queryB;
       } else if (isColorInfo(queryA) && isColorInfo(queryB)) {
-        // 现在我们确定queryA和queryB都是ColorInfo类型，可以安全地调用isColorInfoEqual
         return isColorInfoEqual(queryA, queryB);
+      } else if (isFontInfo(queryA) && isFontInfo(queryB)) {
+        return isFontInfoEqual(queryA, queryB);
       }
-      // 如果需要，这里可以添加更多的逻辑来处理FontInfo, ComponentInfo, StyleInfo等类型的比较
+      // 如果需要，这里可以添加更多的逻辑来处理其他类型的比较
       return false; // 不同的类型或无法比较的类型
     };
 
@@ -235,7 +259,17 @@ function App() {
       searchParams.includeFills ===
         currentTabData.lastSearchParams.includeFills &&
       searchParams.includeStrokes ===
-        currentTabData.lastSearchParams.includeStrokes
+        currentTabData.lastSearchParams.includeStrokes &&
+      searchParams.includeNormalFont ===
+        currentTabData.lastSearchParams.includeNormalFont &&
+      searchParams.includeMissingFont ===
+        currentTabData.lastSearchParams.includeMissingFont &&
+      searchParams.includeNormalComponent ===
+        currentTabData.lastSearchParams.includeNormalComponent &&
+      searchParams.includeMissingComponent ===
+        currentTabData.lastSearchParams.includeMissingComponent &&
+      searchParams.includeExternalComponent ===
+        currentTabData.lastSearchParams.includeExternalComponent
     ) {
       // Further check if search results are not empty
       if (currentTabData.searchResults.length > 0) {
@@ -267,6 +301,11 @@ function App() {
               matchWholeWord: searchParams.matchWholeWord,
               includeFills: searchParams.includeFills,
               includeStrokes: searchParams.includeStrokes,
+              includeNormalFont: searchParams.includeNormalFont,
+              includeMissingFont: searchParams.includeMissingFont,
+              includeNormalComponent: searchParams.includeNormalComponent,
+              includeMissingComponent: searchParams.includeMissingComponent,
+              includeExternalComponent: searchParams.includeExternalComponent,
             },
           },
         },
@@ -340,26 +379,24 @@ function App() {
     updateSelectedNodeId(tab, nodeId);
     setGlobalCurrentNode(nodeId);
   };
-
-  const handleRefreshColors = () => {
+  const handleRefreshSearchList = (searchParams: SearchParams) => {
     parent.postMessage(
       {
         pluginMessage: {
           type: "get-searchlist",
-          payload: { currentTab },
-        },
-      },
-      "*"
-    );
-  };
-
-  const handleButtonClick = () => {
-    // 发送消息到 Figma 主线程
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "get-searchlist",
-          payload: { currentTab },
+          payload: {
+            currentTab,
+            query: searchParams.query,
+            caseSensitive: searchParams.caseSensitive,
+            matchWholeWord: searchParams.matchWholeWord,
+            includeFills: searchParams.includeFills,
+            includeStrokes: searchParams.includeStrokes,
+            includeNormalFont: searchParams.includeNormalFont,
+            includeMissingFont: searchParams.includeMissingFont,
+            includeNormalComponent: searchParams.includeNormalComponent,
+            includeMissingComponent: searchParams.includeMissingComponent,
+            includeExternalComponent: searchParams.includeExternalComponent,
+          },
         },
       },
       "*"
@@ -545,7 +582,7 @@ function App() {
   useEffect(() => {
     // 此 useEffect 用于监听 tabData 下所有标签的 searchList 的变化
     // 对于本示例，我们暂时仅处理 color 标签
-    console.log("SearchList has been updated", tabData.font.searchList);
+    console.log("SearchList has been updated", tabData.instance.searchList);
   }, [
     tabData.color.searchList,
     tabData.font.searchList,
@@ -564,7 +601,7 @@ function App() {
     <>
       <div className="flex flex-col items-center w-full fixed top-0 left-0">
         <Tabs defaultValue="text" className="w-full flex flex-col items-center">
-          <TabsList className="grid w-full grid-cols-6 rounded-none">
+          <TabsList className="grid w-full grid-cols-5 rounded-none">
             {Object.values(TabNames).map((tab) => (
               <TabsTrigger
                 key={tab}
@@ -583,8 +620,8 @@ function App() {
               onUpdateSearchParams={updateSearchParams("text")} // 更新搜索参数
               activeTab={currentTab} // 当前激活的 tab
               colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
-              onSelectColor={handleSelectColor} // 处理颜色选择的函数
-              handleRefreshColors={handleRefreshColors}
+              // onSelectColor={handleSelectColor} // 处理颜色选择的函数
+              // handleRefreshColors={handleRefreshSearchList}
             />
 
             <ReplaceComponent
@@ -612,8 +649,8 @@ function App() {
               onUpdateSearchParams={updateSearchParams("layer")} // 更新搜索参数
               activeTab={currentTab} // 当前激活的 tab
               colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
-              onSelectColor={handleSelectColor} // 处理颜色选择的函数
-              handleRefreshColors={handleRefreshColors}
+              // onSelectColor={handleSelectColor} // 处理颜色选择的函数
+              // handleRefreshColors={handleRefreshSearchList}
             />
 
             <ReplaceComponent
@@ -643,7 +680,9 @@ function App() {
               activeTab={currentTab} // 当前激活的 tab
               colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
               onSelectColor={handleSelectColor} // 处理颜色选择的函数
-              handleRefreshColors={handleRefreshColors}
+              handleRefreshColors={() =>
+                handleRefreshSearchList(tabData.color.currentSearchParams)
+              }
             />
 
             <div className="w-full flex justify-end mt-2">
@@ -683,7 +722,35 @@ function App() {
               activeTab={currentTab} // 当前激活的 tab
               fontData={tabData.font.searchList} // 使用 tabData 中的 color 数据
               onSelectFont={handleSelectFont} // 处理颜色选择的函数
-              handleRefreshFonts={handleRefreshColors}
+              handleRefreshFonts={() =>
+                handleRefreshSearchList(tabData.font.currentSearchParams)
+              }
+            />
+
+            <div className="w-full flex justify-end mt-2">
+              <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+              <div className="search-results-container">
+                {/* 其他内容... */}
+                {
+                  // 只有当当前标签的 searchResults 不为空时，才显示 "Select all" 按钮
+                  tabData[currentTab].searchResults.length > 0 && (
+                    <Button
+                      className="w-24 bg-blue-500 text-white hover:bg-blue-700 mr-1"
+                      onClick={() => handleSelectAll(currentTab)}
+                    >
+                      Select all
+                    </Button>
+                  )
+                }
+              </div>
+            </div>
+
+            <SearchResult
+              searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
+              query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
+              currentTab={currentTab} // 当前激活的标签页
+              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
+              onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
             />
           </TabsContent>
 
@@ -697,13 +764,14 @@ function App() {
               activeTab={currentTab} // 当前激活的 tab
               componentData={tabData.instance.searchList} // 使用 tabData 中的 color 数据
               onSelectComponent={handleSelectComponent} // 处理颜色选择的函数
-              handleRefreshComponents={handleRefreshColors}
+              handleRefreshComponents={() =>
+                handleRefreshSearchList(tabData.instance.currentSearchParams)
+              }
             />
-            <Button onClick={handleButtonClick}>获取所有组件</Button>
           </TabsContent>
-          <TabsContent value="style">
+          {/* <TabsContent value="style">
             <Button onClick={handleButtonClick}>获取所有样式</Button>
-          </TabsContent>
+          </TabsContent> */}
 
           {/* <TabsContent value="variable"></TabsContent> */}
         </Tabs>

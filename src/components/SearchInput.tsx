@@ -12,7 +12,11 @@ import { Button } from "./ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
 import ColorScrollArea from "./ColorScrollArea"; // 确保路径正确
 import FontScrollArea from "./FontScrollArea";
-import { FigmaComponentIcon, FigmaTextIcon } from "@/icons/FigmaIcons";
+import {
+  FigmaComponentIcon,
+  FigmaMaskIcon,
+  FigmaTextIcon,
+} from "@/icons/FigmaIcons";
 import ComponentScrollArea from "./ComponentScrollArea";
 
 interface SearchInputProps {
@@ -61,6 +65,11 @@ const SearchInput: React.FC<SearchInputProps> = ({
     matchWholeWord,
     includeFills,
     includeStrokes,
+    includeNormalFont,
+    includeMissingFont,
+    includeNormalComponent,
+    includeMissingComponent,
+    includeExternalComponent,
   } = searchParams;
   const handleColorSelect = (colorInfo: ColorInfo) => {
     // 更新父组件的searchParams中的query为选中的颜色信息
@@ -176,7 +185,70 @@ const SearchInput: React.FC<SearchInputProps> = ({
 
   const getFontDisplayText = (fontInfo: FontInfo) => {
     if (!fontInfo) return "Select Font";
-    return `${fontInfo.fontFamily} ${fontInfo.fontStyle}`;
+
+    // 截断 fontFamily 如果它太长
+    const fontFamilyDisplay =
+      fontInfo.fontFamily.length > 20
+        ? `${fontInfo.fontFamily.substring(0, 17)}...`
+        : fontInfo.fontFamily;
+
+    // const textColorClass = fontInfo.isMissing
+    //   ? "text-orange-500"
+    //   : "text-black";
+
+    const textColorClass = "text-black";
+
+    // const styleColorClass = fontInfo.isMissing
+    //   ? "text-orange-300" // 使用较浅的橙色
+    //   : "text-gray-400"; // 默认较浅的灰色
+
+    const styleColorClass = "text-gray-400";
+
+    return (
+      <>
+        <span className={`text-sm ${textColorClass}`}>{fontFamilyDisplay}</span>
+        <span className={`text-xs ${styleColorClass}`}>
+          {fontInfo.fontStyle}
+        </span>
+      </>
+    );
+  };
+
+  const getComponentDisplayText = (componentInfo: ComponentInfo) => {
+    if (!componentInfo) return "Select Font";
+
+    // 截断 fontFamily 如果它太长
+    const componentNameDisplay =
+      componentInfo.name.length > 20
+        ? `${componentInfo.name.substring(0, 17)}...`
+        : componentInfo.name;
+
+    // const textColorClass = componentInfo.isMissing
+    //   ? "text-orange-500"
+    //   : componentInfo.isExternal
+    //   ? "text-blue-500"
+    //     : "text-black";
+
+    const textColorClass = "text-black";
+
+    // const descriptionColorClass = componentInfo.isMissing
+    //   ? "text-orange-300" // 使用较浅的橙色
+    //   : componentInfo.isExternal
+    //   ? "text-blue-300" // 使用较浅的蓝色
+    //     : "text-gray-400"; // 默认较浅的灰色
+
+    const descriptionColorClass = "text-gray-400";
+
+    return (
+      <>
+        <span className={`text-sm truncate text-left ${textColorClass}`}>
+          {componentNameDisplay}
+        </span>
+        <span className={`text-xs text-left truncate ${descriptionColorClass}`}>
+          {componentInfo.description}
+        </span>
+      </>
+    );
   };
 
   return (
@@ -235,9 +307,9 @@ const SearchInput: React.FC<SearchInputProps> = ({
                           fillColor="black"
                         />
                       )}
-                      <span>
+                      <div className="flex justify-start items-end space-x-3">
                         {getFontDisplayText(searchParams.query as FontInfo)}
-                      </span>
+                      </div>
                     </>
                   ) : (
                     <span>Select Font</span>
@@ -264,8 +336,40 @@ const SearchInput: React.FC<SearchInputProps> = ({
                 className="w-[282px] border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:border-2 bg-white hover:bg-white border-dashed"
                 onClick={handleRefreshComponents}
               >
-                <div className="flex items-center justify-center">
-                  <span>Select Component</span>
+                <div className="flex items-center justify-center space-x-2">
+                  {typeof searchParams.query === "object" &&
+                  searchParams.query !== null &&
+                  "name" in searchParams.query ? (
+                    <>
+                      {searchParams.query.isMissing ? (
+                        <FigmaTextIcon
+                          width="20"
+                          height="20"
+                          fillColor="black"
+                        />
+                      ) : searchParams.query.isExternal ? (
+                        <FigmaMaskIcon
+                          width="20"
+                          height="20"
+                          fillColor="black"
+                        />
+                      ) : (
+                        <FigmaComponentIcon
+                          width="20"
+                          height="20"
+                          fillColor="black"
+                        />
+                      )}
+
+                      <div className="flex justify-start items-end space-x-3">
+                        {getComponentDisplayText(
+                          searchParams.query as ComponentInfo
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <span>Select Component</span>
+                  )}
                 </div>
               </Button>
             </PopoverTrigger>
@@ -276,7 +380,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
                 onComponentSelect={handleComponentSelect}
               />
               <div className="text-sm text-center p-1 mt-2 bg-orange-100 border border-orange-300 rounded-md shadow">
-                Select from the components used in your current selection.
+                Select from the components used in your current page.
               </div>
             </PopoverContent>
           </Popover>
@@ -335,6 +439,51 @@ const SearchInput: React.FC<SearchInputProps> = ({
             onChange={handleChange}
             name="includeStrokes"
             label="Find Strokes"
+          />
+        </div>
+      )}
+
+      {activeTab === TabNames.font && (
+        <div className="flex justify-start w-full max-w-sm space-x-8 mt-2 mb-2 pl-3">
+          <CheckboxWithLabel
+            id="includeNormalFontCheckbox"
+            checked={includeNormalFont ?? true}
+            onChange={handleChange}
+            name="includeNormalFont"
+            label="Normal"
+          />
+          <CheckboxWithLabel
+            id="includeMissingFontCheckbox"
+            checked={includeMissingFont ?? true}
+            onChange={handleChange}
+            name="includeMissingFont"
+            label="Include Missing"
+          />
+        </div>
+      )}
+
+      {activeTab === TabNames.instance && (
+        <div className="flex justify-start w-full max-w-sm space-x-8 mt-2 mb-2 pl-3">
+          <CheckboxWithLabel
+            id="includeNormalComponentCheckbox"
+            checked={includeNormalComponent ?? true}
+            onChange={handleChange}
+            name="includeNormalComponent"
+            label="Normal"
+          />
+          <CheckboxWithLabel
+            id="includeMissingComponentCheckbox"
+            checked={includeMissingComponent ?? true}
+            onChange={handleChange}
+            name="includeMissingComponent"
+            label="Missing"
+          />
+          <CheckboxWithLabel
+            id="includeExternalComponentCheckbox"
+            checked={includeExternalComponent ?? true}
+            onChange={handleChange}
+            name="includeExternalComponent"
+            label="External"
           />
         </div>
       )}
