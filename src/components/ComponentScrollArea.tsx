@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { ComponentInfo } from "@/types";
 import {
   FigmaComponentIcon,
-  FigmaTextIcon,
-  FigmaMaskIcon,
+  FigmaMissingFontIcon,
+  FigmaExternalIcon,
 } from "@/icons/FigmaIcons";
 
 interface ComponentScrollAreaProps {
@@ -62,9 +62,13 @@ const ComponentScrollArea: React.FC<ComponentScrollAreaProps> = ({
           >
             <div style={{ flexShrink: 0 }}>
               {componentInfo.isMissing ? (
-                <FigmaTextIcon width="20" height="20" fillColor="black" />
+                <FigmaMissingFontIcon
+                  width="20"
+                  height="20"
+                  fillColor="black"
+                />
               ) : componentInfo.isExternal ? (
-                <FigmaMaskIcon width="20" height="20" fillColor="black" />
+                <FigmaExternalIcon width="20" height="20" fillColor="black" />
               ) : (
                 <FigmaComponentIcon width="20" height="20" fillColor="black" />
               )}

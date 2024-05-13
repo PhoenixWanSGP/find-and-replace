@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FontInfo } from "@/types"; // 请确保路径正确
-import { FigmaComponentIcon, FigmaTextIcon } from "@/icons/FigmaIcons";
+import { FigmaFontIcon, FigmaMissingFontIcon } from "@/icons/FigmaIcons";
 
 interface FontScrollAreaProps {
   fontData: FontInfo[];
@@ -64,9 +64,13 @@ const FontScrollArea: React.FC<FontScrollAreaProps> = ({
               {" "}
               {/* 图标容器，防止图标被压缩 */}
               {fontInfo.isMissing ? (
-                <FigmaTextIcon width="20" height="20" fillColor="black" />
+                <FigmaMissingFontIcon
+                  width="20"
+                  height="20"
+                  fillColor="black"
+                />
               ) : (
-                <FigmaComponentIcon width="20" height="20" fillColor="black" />
+                <FigmaFontIcon width="20" height="20" fillColor="black" />
               )}
             </div>
             <div className="flex flex-col justify-start text-sm w-full overflow-hidden">

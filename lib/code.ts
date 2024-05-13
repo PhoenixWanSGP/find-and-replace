@@ -498,7 +498,12 @@ if (figma.editorType === "figma") {
     return fontsUsed;
   }
 
-  async function collectComponents(nodes: any[]): Promise<ComponentInfo[]> {
+  async function collectComponents(
+    nodes: any[],
+    includeNormalComponent: boolean,
+    includeMissingComponent: boolean,
+    includeExternalComponent: boolean
+  ): Promise<ComponentInfo[]> {
     console.log("开始查找组件节点");
     const componentNodes = nodes.flatMap((node: any) =>
       "findAll" in node
@@ -530,50 +535,54 @@ if (figma.editorType === "figma") {
           let isExternal = false;
 
           if (!currentPageComponentIds.has(mainComponent.id)) {
-            // 如果 ID 不在当前页面
-            isMissing = true; // 默认标记为 missing
+            isMissing = true;
             if (mainComponent.remote) {
-              // 如果 remote 为 true，重新标记
               isMissing = false;
               isExternal = true;
             }
           } else if (!mainComponent.parent) {
-            // 如果 ID 在当前页面但 parent 不存在
             isMissing = true;
           }
 
-          const componentToAdd = {
-            id: mainComponent.id,
-            name: mainComponent.name,
-            description: mainComponent.description || "No description",
-            isMissing,
-            isExternal,
-          };
-
-          // 添加前进行去重检查
+          // 过滤逻辑：根据布尔值决定是否添加组件
           if (
-            !componentsUsed.some(
-              (component) => component.id === mainComponent.id
-            )
+            (includeNormalComponent && !isMissing && !isExternal) ||
+            (includeMissingComponent && isMissing) ||
+            (includeExternalComponent && isExternal)
           ) {
-            componentsUsed.push(componentToAdd);
+            const componentToAdd = {
+              id: mainComponent.id,
+              name: mainComponent.name,
+              description: mainComponent.description || "No description",
+              isMissing,
+              isExternal,
+            };
+            if (
+              !componentsUsed.some(
+                (component) => component.id === mainComponent.id
+              )
+            ) {
+              componentsUsed.push(componentToAdd);
+            }
           }
         } else {
           console.log(`实例 ${instance.id} 的主组件为null`);
           // 添加特殊 missing-main-component 节点
-          const specialComponentId = "missing-main-component";
-          if (
-            !componentsUsed.some(
-              (component) => component.id === specialComponentId
-            )
-          ) {
-            componentsUsed.push({
-              id: specialComponentId,
-              name: "Missing Main Component",
-              description: "This instance has no main component.",
-              isMissing: true,
-              isExternal: false,
-            });
+          if (includeMissingComponent) {
+            const specialComponentId = "missing-main-component";
+            if (
+              !componentsUsed.some(
+                (component) => component.id === specialComponentId
+              )
+            ) {
+              componentsUsed.push({
+                id: specialComponentId,
+                name: "Missing Main Component",
+                description: "This instance has no main component.",
+                isMissing: true,
+                isExternal: false,
+              });
+            }
           }
         }
       }
@@ -581,14 +590,23 @@ if (figma.editorType === "figma") {
 
     console.log("开始收集其他组件信息并去重");
     componentNodes.forEach((node) => {
+      let isMissing = false; // 默认情况下，直接定义的组件不缺失也不外部
+      let isExternal = false;
+
       if (!componentsUsed.some((component) => component.id === node.id)) {
-        componentsUsed.push({
-          id: node.id,
-          name: node.name,
-          description: "description" in node ? node.description : "",
-          isMissing: false,
-          isExternal: false,
-        });
+        if (
+          (includeNormalComponent && !isMissing && !isExternal) ||
+          (includeMissingComponent && isMissing) ||
+          (includeExternalComponent && isExternal)
+        ) {
+          componentsUsed.push({
+            id: node.id,
+            name: node.name,
+            description: node.description || "",
+            isMissing,
+            isExternal,
+          });
+        }
       }
     });
 
@@ -866,9 +884,12 @@ if (figma.editorType === "figma") {
 
             case TabName.COMPONENT:
               // 总是从当前页面的所有节点中收集组件信息
-              const componentsData = await collectComponents([
-                figma.currentPage,
-              ]);
+              const componentsData = await collectComponents(
+                [figma.currentPage],
+                msg.payload.includeNormalComponent,
+                msg.payload.includeMissingComponent,
+                msg.payload.includeExternalComponent
+              );
               results = {
                 type: "searchlist",
                 payload: {
