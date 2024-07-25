@@ -1,5 +1,3 @@
-// types.ts
-
 export const TabNames = {
   text: "text",
   layer: "layer",
@@ -16,10 +14,10 @@ export type QueryType =
   | ColorInfo
   | FontInfo
   | ComponentInfo
-  | StyleInfo; // 定义一个类型别名，允许query是字符串或ColorInfo类型
+  | StyleInfo;
 
 export interface SearchParams {
-  query: QueryType; // 使用类型别名，使query能够兼容ColorInfo类型
+  query: QueryType;
   caseSensitive?: boolean;
   matchWholeWord?: boolean;
   type: TabName;
@@ -52,21 +50,20 @@ export type TabData = {
 
 export interface ResultBaseNode {
   id: string;
-  type: string; // 明确指定可能的类型
+  type: string;
   name?: string;
   characters?: string;
-  fills?: string; // 添加颜色属性示例
-  fontName?: string; // 添加字体族属性示例
+  fills?: string;
+  fontName?: string;
 }
 
-// 搜索结果的类型
 export interface SearchResults {
   type: TabName;
-  data: ResultBaseNode[]; // 使用BaseNode数组来存储所有类型的节点
+  data: ResultBaseNode[];
 }
 
 export interface ColorInfo {
-  r: number; // HEX颜色值
+  r: number;
   g: number;
   b: number;
   a: any | undefined;
@@ -75,7 +72,6 @@ export interface ColorInfo {
 export interface FontInfo {
   fontFamily: string;
   fontStyle: string;
-  // fontSize: number;
   isMissing: boolean;
 }
 

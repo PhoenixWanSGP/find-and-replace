@@ -2,7 +2,7 @@
   "name": "Magi: Find and Replace Text|Layer",
   "id": "1359188420918743310",
   "api": "1.0.0",
-  "main": "dist/code.js",
+  "main": "dist/index.js",
   "capabilities": [],
   "enableProposedApi": false,
   "documentAccess": "dynamic-page",
@@ -11,8 +11,11 @@
   ],
   "ui": "dist/index.html",
   "networkAccess": {
+    "devAllowedDomains": ["http://localhost:3000"],
     "allowedDomains": [
-      "none"
-    ]
-  }
+      "https://freaky-font.com",
+    "http://localhost:3000"    ],
+    "reasoning": "Localhost access is required for development purposes."
+  },
+  "permissions": ["payments"]
 }
