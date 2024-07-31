@@ -12,6 +12,17 @@ import { Message, TabName } from "./types";
 
 if (figma.editorType === "figma") {
   initializeUI();
+  const currentUser = figma.currentUser;
+  const userId = currentUser
+    ? currentUser.id
+    : "User not logged in or no user information available";
+
+  // 将用户UUID发送给UI线程
+  figma.ui.postMessage({
+    type: "user-id",
+    payload: userId,
+  });
+
   figma.clientStorage.getAsync("authToken").then((token) => {
     if (token) {
       figma.ui.postMessage({ type: "AUTH_TOKEN", token });
@@ -26,6 +37,17 @@ if (figma.editorType === "figma") {
     handleUIMessage(msg, inFigmaCurrentNode);
 
     switch (msg.type) {
+      // case "get-user-id":
+      //   {
+      //     const userId = figma.currentUser?.id;
+      //     figma.ui.postMessage({
+      //       type: "user-id",
+      //       userId:
+      //         userId || "User not logged in or no user information available.",
+      //     });
+      //   }
+      //   break;
+
       case "LOGIN":
         {
           await figma.clientStorage.setAsync("authToken", "fake-token");

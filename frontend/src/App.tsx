@@ -19,9 +19,11 @@ import SearchResult from "./components/SearchResult";
 import ResultsIndicator from "./components/ResultsIndicator";
 import { Button } from "./components/ui/button";
 import Login from "./components/Login";
+import React from "react";
 // import ColorScrollArea from "./components/ColorScrollArea";
 
 function App() {
+  const [userId, setUserId] = React.useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<TabName>("text");
   const [globalCurrentNode, setGlobalCurrentNode] = useState<string | null>(
     null
@@ -449,6 +451,11 @@ function App() {
         const { type, payload } = event.data.pluginMessage;
         console.log("====type is:====", type, "====payload is:====", payload);
         switch (type) {
+          case "user-id":
+            setUserId(payload);
+            console.log("User ID:", payload);
+            break;
+
           case "search-results":
             const { category, data } = payload;
             if (Object.values(TabNames).includes(category)) {
@@ -492,7 +499,6 @@ function App() {
 
           case "searchlist":
             if (payload.dataType === "color-results") {
-              // 用提供的颜色数据更新color标签下的searchList
               console.log("====收到所有颜色====", payload.data);
               setTabData((prev) => ({
                 ...prev,
@@ -501,7 +507,6 @@ function App() {
                   searchList: payload.data,
                 },
               }));
-              // console.log("====存好所有颜色====", tabData.color.searchList);
             } else if (payload.dataType === "font-results") {
               console.log("====收到所有字体====", payload.data);
               setTabData((prev) => ({
@@ -524,12 +529,16 @@ function App() {
               console.log("====收到所有样式====", payload.data);
             }
             break;
+
+          default:
+            console.error("Unhandled message type:", type);
         }
       }
     }
-    window.onmessage = handleFigmaMessages;
+
+    window.addEventListener("message", handleFigmaMessages);
     return () => {
-      window.onmessage = null; // 清除消息监听器
+      window.removeEventListener("message", handleFigmaMessages); // 清除消息监听器
     };
   }, []);
 
@@ -606,40 +615,10 @@ function App() {
     // 这里可以根据currentSearchParams的变动执行其他操作
   }, [tabData.color.currentSearchParams]);
 
-  const handleSignIn = () => {
-    console.log("=====Signin clicked=====");
-    const authWindow = window.open(
-      "https://freeviggleai.com/api/auth/signin",
-      "_blank"
-    );
-    const interval = setInterval(() => {
-      if (!authWindow) {
-        console.log("authwindow is null");
-        return;
-      } else if (authWindow.closed) {
-        clearInterval(interval);
-        // Poll for token
-        // fetch('https://yourserver.com/poll-token')
-        //   .then(response => response.json())
-        //   .then(data => {
-        //     parent.postMessage({ pluginMessage: { type: 'save-token', token: data.token } }, '*');
-        //   });
-        console.log("auth window closed");
-      }
-    }, 1000);
-    // 这里可以添加更多处理逻辑，比如更新状态或调用API等
-  };
-
   return (
     <>
       <div className="flex flex-col items-center w-full fixed top-0 left-0">
-        <Login />
-        <Button
-          className="w-24 bg-blue-500 text-white hover:bg-blue-700 mr-1"
-          onClick={() => handleSignIn()}
-        >
-          Sign In
-        </Button>
+        {userId !== null ? <Login userId={userId} /> : <p>Loading...</p>}
         <Tabs defaultValue="text" className="w-full flex flex-col items-center">
           <TabsList className="grid w-full grid-cols-5 rounded-none">
             {Object.values(TabNames).map((tab) => (

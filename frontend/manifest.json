@@ -17,5 +17,7 @@
     "http://localhost:3000"    ],
     "reasoning": "Localhost access is required for development purposes."
   },
-  "permissions": ["payments"]
+  "permissions": [
+    "currentuser"
+  ]
 }
