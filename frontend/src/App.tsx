@@ -20,7 +20,6 @@ import ResultsIndicator from "./components/ResultsIndicator";
 import { Button } from "./components/ui/button";
 import Login from "./components/Login";
 import React from "react";
-// import ColorScrollArea from "./components/ColorScrollArea";
 
 function App() {
   const [userId, setUserId] = React.useState<string | null>(null);
@@ -28,6 +27,12 @@ function App() {
   const [globalCurrentNode, setGlobalCurrentNode] = useState<string | null>(
     null
   );
+
+  // 新增状态用于存储 sessionId、readKey 和 writeKey
+  const [sessionId, setSessionId] = React.useState<string | null>(null);
+  const [readKey, setReadKey] = React.useState<string | null>(null);
+  const [writeKey, setWriteKey] = React.useState<string | null>(null);
+  const [token, setToken] = React.useState<string | null>(null);
 
   const [tabData, setTabData] = useState<TabData>({
     text: {
@@ -618,7 +623,21 @@ function App() {
   return (
     <>
       <div className="flex flex-col items-center w-full fixed top-0 left-0">
-        {userId !== null ? <Login userId={userId} /> : <p>Loading...</p>}
+        {userId !== null ? (
+          <Login
+            userId={userId}
+            sessionId={sessionId}
+            setSessionId={setSessionId}
+            readKey={readKey}
+            setReadKey={setReadKey}
+            writeKey={writeKey}
+            setWriteKey={setWriteKey}
+            token={token}
+            setToken={setToken}
+          />
+        ) : (
+          <p>Loading...</p>
+        )}
         <Tabs defaultValue="text" className="w-full flex flex-col items-center">
           <TabsList className="grid w-full grid-cols-5 rounded-none">
             {Object.values(TabNames).map((tab) => (
