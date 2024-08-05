@@ -47,6 +47,20 @@ const Login: React.FC<LoginProps> = ({
         setToken(data.token);
         setStatus("Logged in");
         console.log("Token acquired:", data.token);
+
+        // 发送 LOGIN 消息到插件主线程
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "LOGIN", // 消息类型
+              payload: {
+                token: data.token, // 将 token 放在 payload 中
+              },
+            },
+          },
+          "*"
+        );
+
         return true; // 表示成功获取 token
       } else {
         console.log("No token found, retrying...");
@@ -100,6 +114,7 @@ const Login: React.FC<LoginProps> = ({
       setSessionId(data.sessionId);
       setWriteKey(data.writeKey);
       setReadKey(data.readKey);
+      setToken(null); // 将 token 设置为 null
       console.log("=====data is:=====", data, "\n===========");
 
       const redirectUrl = `https://freaky-font.com/en/login?sessionId=${data.sessionId}&writeKey=${data.writeKey}`;
@@ -111,7 +126,6 @@ const Login: React.FC<LoginProps> = ({
 
   const handleLogout = () => {
     setToken(null); // 清除 token 状态
-    // localStorage.removeItem("authToken"); // 移除本地存储的 token
     setStatus("Not logged in"); // 更新状态为未登录
     parent.postMessage({ pluginMessage: { type: "LOGOUT" } }, "*");
   };
