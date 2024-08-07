@@ -23,17 +23,17 @@ const Login: React.FC<LoginProps> = ({
   token,
   setToken,
 }) => {
-  const [status, setStatus] = React.useState<string>(
-    "Checking login status..."
-  );
+  // const [status, setStatus] = React.useState<string>(
+  //   "Checking login status..."
+  // );
   const pollInterval = 5000; // 轮询间隔（毫秒）
   const timeoutDuration = 60000; // 超时时间（毫秒）
 
   // 使用轮询来持续检查 token
   const checkToken = async () => {
     if (!readKey || !sessionId) {
-      console.log("Missing sessionId or readKey");
-      return;
+      console.log("Missing sessionId or readKey, skipping checkToken.");
+      return false; // 表示未进行轮询
     }
 
     try {
@@ -45,7 +45,7 @@ const Login: React.FC<LoginProps> = ({
 
       if (data.token) {
         setToken(data.token);
-        setStatus("Logged in");
+        // setStatus("Logged in");
         console.log("Token acquired:", data.token);
 
         // 发送 LOGIN 消息到插件主线程
@@ -74,7 +74,7 @@ const Login: React.FC<LoginProps> = ({
 
   // 启动轮询逻辑
   const startPolling = () => {
-    setStatus("Attempting to retrieve token...");
+    // setStatus("Attempting to retrieve token...");
 
     const intervalId = setInterval(async () => {
       const tokenAcquired = await checkToken();
@@ -86,7 +86,7 @@ const Login: React.FC<LoginProps> = ({
     // 超时处理
     const timeoutId = setTimeout(() => {
       clearInterval(intervalId);
-      setStatus("Token retrieval timed out.");
+      // setStatus("Token retrieval timed out.");
       console.log("Failed to acquire token within the time limit.");
     }, timeoutDuration);
 
@@ -98,7 +98,8 @@ const Login: React.FC<LoginProps> = ({
   };
 
   React.useEffect(() => {
-    if (!token) {
+    if (!token && readKey && sessionId) {
+      // 确保 readKey 和 sessionId 都存在
       const cleanup = startPolling();
       return cleanup;
     }
@@ -126,26 +127,8 @@ const Login: React.FC<LoginProps> = ({
 
   const handleLogout = () => {
     setToken(null); // 清除 token 状态
-    setStatus("Not logged in"); // 更新状态为未登录
+    // setStatus("Not logged in"); // 更新状态为未登录
     parent.postMessage({ pluginMessage: { type: "LOGOUT" } }, "*");
-  };
-
-  const handlePrintToken = () => {
-    console.log("Current auth token:", token);
-    parent.postMessage({ pluginMessage: { type: "PRINT_TOKEN", token } }, "*");
-  };
-
-  const generateKeys = async () => {
-    try {
-      const response = await fetch("https://freaky-font.com/api/keys", {
-        method: "POST",
-        body: JSON.stringify({ sessionId: `figma_${userId}` }),
-      });
-      const data = await response.json();
-      console.log("=====data is:=====", data, "\n===========");
-    } catch (error) {
-      console.error("Error generating keys:", error);
-    }
   };
 
   // 新增函数用于打印当前的 sessionId、readKey、writeKey 和 token
@@ -156,19 +139,61 @@ const Login: React.FC<LoginProps> = ({
     console.log("Write Key:", writeKey);
     console.log("Token:", token);
   };
+  const handlePrintUserInfo = async () => {
+    try {
+      const response = await fetch(
+        "https://freaky-font.com/api/token-to-user",
+        {
+          method: "POST",
+          // headers: {
+          //   "Content-Type": "application/json",
+          // },
+          body: JSON.stringify({ sessionId, token }),
+        }
+      );
+
+      if (!response.ok) {
+        console.error(`HTTP error! Status: ${response.status}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        console.error("Error retrieving user info:", data.error);
+      } else {
+        const userInfo = data.userInfo;
+        console.log("====User Info====");
+        console.log(`UUID: ${userInfo.uuid}`);
+        console.log(`Email: ${userInfo.email}`);
+        console.log(
+          `Created At: ${new Date(userInfo.created_at).toLocaleString()}`
+        );
+        console.log(`Nickname: ${userInfo.nickname}`);
+        console.log(`Avatar URL: ${userInfo.avatar_url}`);
+        console.log(`Locale: ${userInfo.locale || "Not specified"}`);
+        console.log(`Sign-in Type: ${userInfo.signin_type}`);
+        console.log(`Sign-in IP: ${userInfo.signin_ip || "Not specified"}`);
+      }
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+    }
+  };
 
   return (
     <div className="flex flex-col">
-      <p>User ID: {userId}</p>
-      <p>{status}</p>
-      <button onClick={handleLogin}>Login with Google</button>
+      {/* <p>User ID: {userId}</p> */}
+      {/* <p>Token:{token}</p> */}
+      {/* <p>{status}</p> */}
+      <button onClick={handleLogin}>Login</button>
       <button onClick={handleLogout}>Logout</button>
-      <button onClick={handlePrintToken}>Print Token</button>
-      <button onClick={generateKeys}>GenerateKeys</button>
+      {/* <button onClick={handlePrintToken}>Print Token</button>
+      <button onClick={generateKeys}>GenerateKeys</button> */}
       {/* 新增按钮 */}
       <button onClick={handlePrintCurrentState}>Print Current State</button>
+      <button onClick={handlePrintUserInfo}>Print User Info</button>
       {/* 新增按钮用于主动发起 checkToken 请求 */}
-      <button onClick={checkToken}>Check Token</button>
+      {/* <button onClick={checkToken}>Check Token</button> */}
     </div>
   );
 };

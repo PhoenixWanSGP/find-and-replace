@@ -457,8 +457,19 @@ function App() {
         console.log("====type is:====", type, "====payload is:====", payload);
         switch (type) {
           case "user-id":
+            setSessionId(`figma_${payload}`);
             setUserId(payload);
-            console.log("User ID:", payload);
+            console.log("User ID:", userId);
+            break;
+
+          case "AUTH_TOKEN":
+            setToken(payload);
+            console.log("Token:", payload);
+            break;
+
+          case "NO_AUTH":
+            setToken(null);
+            console.log("Token is null");
             break;
 
           case "search-results":
