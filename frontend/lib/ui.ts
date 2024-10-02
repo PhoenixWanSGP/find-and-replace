@@ -5,7 +5,7 @@ import { Message } from "./types";
 export function initializeUI() {
   figma.showUI(__html__, {
     height: 528,
-    width: 400,
+    width: 500,
   });
 }
 

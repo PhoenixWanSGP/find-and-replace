@@ -9,6 +9,17 @@ export const TabNames = {
 
 export type TabName = keyof typeof TabNames;
 
+export interface UserInfo {
+  uuid: string;
+  email: string;
+  created_at: string;
+  nickname: string;
+  avatar_url: string;
+  locale?: string;
+  signin_type: string;
+  signin_ip?: string;
+}
+
 export type QueryType =
   | string
   | ColorInfo

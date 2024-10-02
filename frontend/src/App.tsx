@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabContext, TabList, TabPanel } from "@mui/lab";
+import { Tab, Button } from "@mui/material";
 import {
   ColorInfo,
   ComponentInfo,
@@ -11,15 +12,16 @@ import {
   TabData,
   TabName,
   TabNames,
+  UserInfo,
 } from "./types";
 import SearchInput from "./components/SearchInput";
 import ReplaceComponent from "./components/ReplaceComponent";
-import Footer from "./components/Footer";
+// import Footer from "./components/Footer";
 import SearchResult from "./components/SearchResult";
 import ResultsIndicator from "./components/ResultsIndicator";
-import { Button } from "./components/ui/button";
-import Login from "./components/Login";
+// import { Button } from "./components/ui/button";
 import React from "react";
+import Header from "./components/Header";
 
 function App() {
   const [userId, setUserId] = React.useState<string | null>(null);
@@ -27,6 +29,7 @@ function App() {
   const [globalCurrentNode, setGlobalCurrentNode] = useState<string | null>(
     null
   );
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
   // 新增状态用于存储 sessionId、readKey 和 writeKey
   const [sessionId, setSessionId] = React.useState<string | null>(null);
@@ -184,8 +187,10 @@ function App() {
     updateReplaceParams(tab)({ nodeId: nodeId });
   };
 
-  const handleTabChange = (newTab: TabName) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: string) => {
+    const newTab = newValue as TabName;
     setCurrentTab(newTab);
+
     const newNodeId = tabData[newTab].selectedNodeId;
     if (newNodeId !== globalCurrentNode) {
       setGlobalCurrentNode(newNodeId);
@@ -633,226 +638,246 @@ function App() {
 
   return (
     <>
-      <div className="flex flex-col items-center w-full fixed top-0 left-0">
-        {userId !== null ? (
-          <Login
-            userId={userId}
-            sessionId={sessionId}
-            setSessionId={setSessionId}
-            readKey={readKey}
-            setReadKey={setReadKey}
-            writeKey={writeKey}
-            setWriteKey={setWriteKey}
-            token={token}
-            setToken={setToken}
-          />
-        ) : (
-          <p>Loading...</p>
-        )}
-        <Tabs defaultValue="text" className="w-full flex flex-col items-center">
-          <TabsList className="grid w-full grid-cols-5 rounded-none">
-            {Object.values(TabNames).map((tab) => (
-              <TabsTrigger
-                key={tab}
-                value={tab}
-                onClick={() => handleTabChange(tab)}
+      <div className="w-full">
+        {/* 确保 Header 有一个明确的高度 */}
+        <div
+          className="w-full fixed top-0 left-0 bg-white z-10"
+          style={{ height: "20px" }}
+        >
+          {userId !== null ? (
+            <Header
+              userId={userId}
+              sessionId={sessionId}
+              setSessionId={setSessionId}
+              readKey={readKey}
+              setReadKey={setReadKey}
+              writeKey={writeKey}
+              setWriteKey={setWriteKey}
+              token={token}
+              setToken={setToken}
+              userInfo={userInfo}
+              setUserInfo={setUserInfo}
+            />
+          ) : (
+            <p>Loading...</p>
+          )}
+        </div>
+
+        {/* 为 Tabs 设置 margin-top，确保它们在 Header 下方 */}
+        <div className="w-full h-full flex -ml-8 left-0 p-0">
+          {/* 左侧 TabsList */}
+          <div className="w-1/5 bg-gray-100 mx-0 left-0 p-0">
+            <TabContext value={currentTab}>
+              <TabList
+                onChange={handleTabChange}
+                orientation="vertical"
+                variant="scrollable"
+                className="border-r border-gray-300 ml-0 left-0 p-0"
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+                {Object.values(TabNames).map((tab) => (
+                  <Tab
+                    key={tab}
+                    label={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    value={tab}
+                    className="text-left"
+                  />
+                ))}
+              </TabList>
+            </TabContext>
+          </div>
 
-          <TabsContent value="text" className="flex flex-col items-center m-0">
-            <SearchInput
-              searchParams={tabData.text.currentSearchParams} // 获取 text 类型的搜索参数
-              onSearch={() => handleSearch(tabData.text.currentSearchParams)} // 进行搜索
-              onUpdateSearchParams={updateSearchParams("text")} // 更新搜索参数
-              activeTab={currentTab} // 当前激活的 tab
-              colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
-              // onSelectColor={handleSelectColor} // 处理颜色选择的函数
-              // handleRefreshColors={handleRefreshSearchList}
-            />
+          {/* 右侧内容部分 */}
+          <div className="w-4/5 ml-0">
+            <TabContext value={currentTab}>
+              {/* Text Tab Content */}
+              <TabPanel value="text" className="w-full">
+                <SearchInput
+                  searchParams={tabData.text.currentSearchParams}
+                  onSearch={() =>
+                    handleSearch(tabData.text.currentSearchParams)
+                  }
+                  onUpdateSearchParams={updateSearchParams("text")}
+                  activeTab={currentTab}
+                  colorData={tabData.color.searchList}
+                />
+                <ReplaceComponent
+                  replaceParams={tabData.text.replaceParams}
+                  onReplace={(params, replaceAll) =>
+                    handleReplace(params, replaceAll)
+                  }
+                  onUpdateReplaceParams={updateReplaceParams("text")}
+                />
+                <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+                <SearchResult
+                  searchResults={tabData[currentTab].searchResults}
+                  query={tabData[currentTab].lastSearchParams.query}
+                  currentTab={currentTab}
+                  selectedNodeId={tabData[currentTab].selectedNodeId}
+                  onSelectNode={(nodeId) =>
+                    handleSelectNode(nodeId, currentTab)
+                  }
+                />
+              </TabPanel>
 
-            <ReplaceComponent
-              replaceParams={tabData.text.replaceParams}
-              onReplace={(params, replaceAll) =>
-                handleReplace(params, replaceAll)
-              } // 不需要传递 currentTab
-              onUpdateReplaceParams={updateReplaceParams("text")}
-            />
-            <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+              {/* Layer Tab Content */}
+              <TabPanel value="layer" className="p-0">
+                <SearchInput
+                  searchParams={tabData.layer.currentSearchParams}
+                  onSearch={() =>
+                    handleSearch(tabData.layer.currentSearchParams)
+                  }
+                  onUpdateSearchParams={updateSearchParams("layer")}
+                  activeTab={currentTab}
+                  colorData={tabData.color.searchList}
+                />
+                <ReplaceComponent
+                  replaceParams={tabData.layer.replaceParams}
+                  onReplace={(params, replaceAll) =>
+                    handleReplace(params, replaceAll)
+                  }
+                  onUpdateReplaceParams={updateReplaceParams("layer")}
+                />
+                <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+                <SearchResult
+                  searchResults={tabData[currentTab].searchResults}
+                  query={tabData[currentTab].lastSearchParams.query}
+                  currentTab={currentTab}
+                  selectedNodeId={tabData[currentTab].selectedNodeId}
+                  onSelectNode={(nodeId) =>
+                    handleSelectNode(nodeId, currentTab)
+                  }
+                />
+              </TabPanel>
 
-            <SearchResult
-              searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
-              query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
-              currentTab={currentTab} // 当前激活的标签页
-              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
-              onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
-            />
-          </TabsContent>
+              {/* Color Tab Content */}
+              <TabPanel value="color" className="p-0">
+                <SearchInput
+                  searchParams={tabData.color.currentSearchParams}
+                  onSearch={() =>
+                    handleSearch(tabData.color.currentSearchParams)
+                  }
+                  onUpdateSearchParams={updateSearchParams("color")}
+                  activeTab={currentTab}
+                  colorData={tabData.color.searchList}
+                  onSelectColor={handleSelectColor}
+                  handleRefreshColors={() =>
+                    handleRefreshSearchList(tabData.color.currentSearchParams)
+                  }
+                />
+                <div className="w-full flex justify-end mt-2">
+                  <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+                  <div className="flex justify-end mt-2">
+                    {tabData[currentTab].searchResults.length > 0 && (
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => handleSelectAll(currentTab)}
+                        className="w-24 bg-blue-500 text-white hover:bg-blue-700"
+                      >
+                        Select all
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <SearchResult
+                  searchResults={tabData[currentTab].searchResults}
+                  query={tabData[currentTab].lastSearchParams.query}
+                  currentTab={currentTab}
+                  selectedNodeId={tabData[currentTab].selectedNodeId}
+                  onSelectNode={(nodeId) =>
+                    handleSelectNode(nodeId, currentTab)
+                  }
+                />
+              </TabPanel>
 
-          <TabsContent value="layer" className="flex flex-col items-center m-0">
-            <SearchInput
-              searchParams={tabData.layer.currentSearchParams} // 获取 text 类型的搜索参数
-              onSearch={() => handleSearch(tabData.layer.currentSearchParams)} // 进行搜索
-              onUpdateSearchParams={updateSearchParams("layer")} // 更新搜索参数
-              activeTab={currentTab} // 当前激活的 tab
-              colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
-              // onSelectColor={handleSelectColor} // 处理颜色选择的函数
-              // handleRefreshColors={handleRefreshSearchList}
-            />
+              {/* Font Tab Content */}
+              <TabPanel value="font" className="p-0">
+                <SearchInput
+                  searchParams={tabData.font.currentSearchParams}
+                  onSearch={() =>
+                    handleSearch(tabData.font.currentSearchParams)
+                  }
+                  onUpdateSearchParams={updateSearchParams("font")}
+                  activeTab={currentTab}
+                  fontData={tabData.font.searchList}
+                  onSelectFont={handleSelectFont}
+                  handleRefreshFonts={() =>
+                    handleRefreshSearchList(tabData.font.currentSearchParams)
+                  }
+                />
+                <div className="w-full flex justify-end mt-2">
+                  <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+                  <div className="flex justify-end mt-2">
+                    {tabData[currentTab].searchResults.length > 0 && (
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => handleSelectAll(currentTab)}
+                        className="w-24 bg-blue-500 text-white hover:bg-blue-700"
+                      >
+                        Select all
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <SearchResult
+                  searchResults={tabData[currentTab].searchResults}
+                  query={tabData[currentTab].lastSearchParams.query}
+                  currentTab={currentTab}
+                  selectedNodeId={tabData[currentTab].selectedNodeId}
+                  onSelectNode={(nodeId) =>
+                    handleSelectNode(nodeId, currentTab)
+                  }
+                />
+              </TabPanel>
 
-            <ReplaceComponent
-              replaceParams={tabData.layer.replaceParams}
-              onReplace={(params, replaceAll) =>
-                handleReplace(params, replaceAll)
-              } // 不需要传递 currentTab
-              onUpdateReplaceParams={updateReplaceParams("layer")}
-            />
-            <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+              {/* Instance Tab Content */}
+              <TabPanel value="instance" className="p-0">
+                <SearchInput
+                  searchParams={tabData.instance.currentSearchParams}
+                  onSearch={() =>
+                    handleSearch(tabData.instance.currentSearchParams)
+                  }
+                  onUpdateSearchParams={updateSearchParams("instance")}
+                  activeTab={currentTab}
+                  componentData={tabData.instance.searchList}
+                  onSelectComponent={handleSelectComponent}
+                  handleRefreshComponents={() =>
+                    handleRefreshSearchList(
+                      tabData.instance.currentSearchParams
+                    )
+                  }
+                />
+                <div className="w-full flex justify-end mt-2">
+                  <ResultsIndicator currentTab={currentTab} tabData={tabData} />
+                  <div className="flex justify-end mt-2">
+                    {tabData[currentTab].searchResults.length > 0 && (
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => handleSelectAll(currentTab)}
+                        className="w-24 bg-blue-500 text-white hover:bg-blue-700"
+                      >
+                        Select all
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <SearchResult
+                  searchResults={tabData[currentTab].searchResults}
+                  query={tabData[currentTab].lastSearchParams.query}
+                  currentTab={currentTab}
+                  selectedNodeId={tabData[currentTab].selectedNodeId}
+                  onSelectNode={(nodeId) =>
+                    handleSelectNode(nodeId, currentTab)
+                  }
+                />
+              </TabPanel>
+            </TabContext>
+          </div>
+        </div>
 
-            <SearchResult
-              searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
-              query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
-              currentTab={currentTab} // 当前激活的标签页
-              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
-              onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
-            />
-          </TabsContent>
-
-          <TabsContent value="color" className="flex flex-col items-center m-0">
-            {/* Scroll Area to display colors */}
-            <SearchInput
-              searchParams={tabData.color.currentSearchParams} // 获取 text 类型的搜索参数
-              onSearch={() => handleSearch(tabData.color.currentSearchParams)} // 进行搜索
-              onUpdateSearchParams={updateSearchParams("color")} // 更新搜索参数
-              activeTab={currentTab} // 当前激活的 tab
-              colorData={tabData.color.searchList} // 使用 tabData 中的 color 数据
-              onSelectColor={handleSelectColor} // 处理颜色选择的函数
-              handleRefreshColors={() =>
-                handleRefreshSearchList(tabData.color.currentSearchParams)
-              }
-            />
-
-            <div className="w-full flex justify-end mt-2">
-              <ResultsIndicator currentTab={currentTab} tabData={tabData} />
-              <div className="search-results-container">
-                {/* 其他内容... */}
-                {
-                  // 只有当当前标签的 searchResults 不为空时，才显示 "Select all" 按钮
-                  tabData[currentTab].searchResults.length > 0 && (
-                    <Button
-                      className="w-24 bg-blue-500 text-white hover:bg-blue-700 mr-1"
-                      onClick={() => handleSelectAll(currentTab)}
-                    >
-                      Select all
-                    </Button>
-                  )
-                }
-              </div>
-            </div>
-
-            <SearchResult
-              searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
-              query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
-              currentTab={currentTab} // 当前激活的标签页
-              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
-              onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
-            />
-
-            {/* Refresh button to trigger color data update */}
-          </TabsContent>
-
-          <TabsContent value="font" className="flex flex-col items-center m-0">
-            <SearchInput
-              searchParams={tabData.font.currentSearchParams} // 获取 text 类型的搜索参数
-              onSearch={() => handleSearch(tabData.font.currentSearchParams)} // 进行搜索
-              onUpdateSearchParams={updateSearchParams("font")} // 更新搜索参数
-              activeTab={currentTab} // 当前激活的 tab
-              fontData={tabData.font.searchList} // 使用 tabData 中的 color 数据
-              onSelectFont={handleSelectFont} // 处理颜色选择的函数
-              handleRefreshFonts={() =>
-                handleRefreshSearchList(tabData.font.currentSearchParams)
-              }
-            />
-
-            <div className="w-full flex justify-end mt-2">
-              <ResultsIndicator currentTab={currentTab} tabData={tabData} />
-              <div className="search-results-container">
-                {/* 其他内容... */}
-                {
-                  // 只有当当前标签的 searchResults 不为空时，才显示 "Select all" 按钮
-                  tabData[currentTab].searchResults.length > 0 && (
-                    <Button
-                      className="w-24 bg-blue-500 text-white hover:bg-blue-700 mr-1"
-                      onClick={() => handleSelectAll(currentTab)}
-                    >
-                      Select all
-                    </Button>
-                  )
-                }
-              </div>
-            </div>
-
-            <SearchResult
-              searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
-              query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
-              currentTab={currentTab} // 当前激活的标签页
-              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
-              onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
-            />
-          </TabsContent>
-
-          <TabsContent
-            value="instance"
-            className="flex flex-col items-center m-0"
-          >
-            <SearchInput
-              searchParams={tabData.instance.currentSearchParams} // 获取 text 类型的搜索参数
-              onSearch={() =>
-                handleSearch(tabData.instance.currentSearchParams)
-              } // 进行搜索
-              onUpdateSearchParams={updateSearchParams("instance")} // 更新搜索参数
-              activeTab={currentTab} // 当前激活的 tab
-              componentData={tabData.instance.searchList} // 使用 tabData 中的 color 数据
-              onSelectComponent={handleSelectComponent} // 处理颜色选择的函数
-              handleRefreshComponents={() =>
-                handleRefreshSearchList(tabData.instance.currentSearchParams)
-              }
-            />
-            <div className="w-full flex justify-end mt-2">
-              <ResultsIndicator currentTab={currentTab} tabData={tabData} />
-              <div className="search-results-container">
-                {/* 其他内容... */}
-                {
-                  // 只有当当前标签的 searchResults 不为空时，才显示 "Select all" 按钮
-                  tabData[currentTab].searchResults.length > 0 && (
-                    <Button
-                      className="w-24 bg-blue-500 text-white hover:bg-blue-700 mr-1"
-                      onClick={() => handleSelectAll(currentTab)}
-                    >
-                      Select all
-                    </Button>
-                  )
-                }
-              </div>
-            </div>
-
-            <SearchResult
-              searchResults={tabData[currentTab].searchResults} // 使用当前标签页的搜索结果
-              query={tabData[currentTab].lastSearchParams.query} // 使用当前标签页的最后搜索词
-              currentTab={currentTab} // 当前激活的标签页
-              selectedNodeId={tabData[currentTab].selectedNodeId} // 当前标签页选中的节点ID
-              onSelectNode={(nodeId) => handleSelectNode(nodeId, currentTab)} // 处理节点选择事件，传递当前标签页
-            />
-          </TabsContent>
-          {/* <TabsContent value="style">
-            <Button onClick={handleButtonClick}>获取所有样式</Button>
-          </TabsContent> */}
-
-          {/* <TabsContent value="variable"></TabsContent> */}
-        </Tabs>
-        <Footer />
+        {/* <Footer /> */}
       </div>
     </>
   );
